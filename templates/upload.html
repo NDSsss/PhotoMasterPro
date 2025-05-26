@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработка фото - PhotoProcessor</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-camera me-2"></i>
+                PhotoProcessor
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Главная</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/upload">Обработать фото</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showLoginModal()">Войти</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <h1 class="text-center mb-5">Обработка фотографий</h1>
+                
+                <!-- Processing Type Selection -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>
+                            Выберите тип обработки
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="processingType" id="removeBg" value="remove-background" checked>
+                                    <label class="form-check-label" for="removeBg">
+                                        <i class="fas fa-scissors me-2"></i>
+                                        Удаление фона
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="processingType" id="addFrame" value="add-frame">
+                                    <label class="form-check-label" for="addFrame">
+                                        <i class="fas fa-frame me-2"></i>
+                                        Добавить рамку
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="processingType" id="createCollage" value="create-collage">
+                                    <label class="form-check-label" for="createCollage">
+                                        <i class="fas fa-images me-2"></i>
+                                        Создать коллаж
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="processingType" id="retouch" value="retouch">
+                                    <label class="form-check-label" for="retouch">
+                                        <i class="fas fa-magic me-2"></i>
+                                        Автоматическая ретушь
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Collage Options (hidden by default) -->
+                <div class="card mb-4 d-none" id="collageOptions">
+                    <div class="card-header">
+                        <h6 class="mb-0">Настройки коллажа</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Тип коллажа</label>
+                            <select class="form-select" id="collageType">
+                                <option value="polaroid">Полароид (1 фото)</option>
+                                <option value="5x15">5x15 (3 фото)</option>
+                                <option value="5x5">5x5 (2 фото)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3" id="captionInput">
+                            <label for="caption" class="form-label">Подпись (для полароида)</label>
+                            <input type="text" class="form-control" id="caption" placeholder="Введите подпись...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Frame Options (hidden by default) -->
+                <div class="card mb-4 d-none" id="frameOptions">
+                    <div class="card-header">
+                        <h6 class="mb-0">Настройки рамки</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Стиль рамки</label>
+                            <select class="form-select" id="frameStyle">
+                                <option value="classic">Классическая</option>
+                                <option value="modern">Современная</option>
+                                <option value="vintage">Винтаж</option>
+                                <option value="elegant">Элегантная</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Upload -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>
+                            Загрузить фотографии
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                            <div class="upload-content">
+                                <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                                <h5>Перетащите файлы сюда или нажмите для выбора</h5>
+                                <p class="text-muted mb-0">Поддерживаются: JPG, PNG (максимум 10 МБ каждый)</p>
+                            </div>
+                            <input type="file" id="fileInput" multiple accept="image/*" class="d-none">
+                        </div>
+                        
+                        <!-- File Preview -->
+                        <div id="filePreview" class="mt-3"></div>
+                        
+                        <!-- Process Button -->
+                        <button type="button" class="btn btn-primary btn-lg w-100 mt-3 d-none" id="processBtn">
+                            <i class="fas fa-magic me-2"></i>
+                            Обработать фотографии
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div class="card d-none" id="progressCard">
+                    <div class="card-body">
+                        <h6>Обработка...</h6>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted mt-2 d-block" id="progressText">Подготовка к обработке...</small>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="card d-none" id="resultsCard">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Результаты обработки
+                        </h5>
+                    </div>
+                    <div class="card-body" id="resultsContent">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Вход в систему</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Имя пользователя</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Пароль</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Войти</button>
+                    </form>
+                    <hr>
+                    <p class="text-center mb-0">
+                        Нет аккаунта? 
+                        <a href="#" onclick="showRegisterModal()" class="text-decoration-none">Зарегистрироваться</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal fade" id="registerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Регистрация</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerForm">
+                        <div class="mb-3">
+                            <label for="regUsername" class="form-label">Имя пользователя</label>
+                            <input type="text" class="form-control" id="regUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="regEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regPassword" class="form-label">Пароль</label>
+                            <input type="password" class="form-control" id="regPassword" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Зарегистрироваться</button>
+                    </form>
+                    <hr>
+                    <p class="text-center mb-0">
+                        Уже есть аккаунт? 
+                        <a href="#" onclick="showLoginModal()" class="text-decoration-none">Войти</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
