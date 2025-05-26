@@ -324,14 +324,20 @@ async def create_collage(
         raise HTTPException(status_code=500, detail="Error processing images")
 
 @app.post("/api/add-frame")
-async def add_frame(request: Request, frame_style: str = Form(...), file: UploadFile = File(...)):
+async def add_frame(
+    request: Request, 
+    frame_type: str = Form(...),
+    file: UploadFile = File(...),
+    frame_style: str = Form(None),
+    frame_file: UploadFile = File(None)
+):
     user = await get_current_user_optional(request)
     
     if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
     try:
-        # Save uploaded file
+        # Save uploaded image file
         file_id = str(uuid.uuid4())
         upload_path = f"uploads/{file_id}_{file.filename}"
         
@@ -339,8 +345,27 @@ async def add_frame(request: Request, frame_style: str = Form(...), file: Upload
             content = await file.read()
             buffer.write(content)
         
-        # Process image
-        output_path = await image_processor.add_frame(upload_path, frame_style, file_id)
+        # Process frame
+        if frame_type == "custom" and frame_file:
+            # Save custom frame file
+            frame_path = f"uploads/{file_id}_frame_{frame_file.filename}"
+            with open(frame_path, "wb") as buffer:
+                frame_content = await frame_file.read()
+                buffer.write(frame_content)
+            
+            # Process with custom frame
+            output_path = await image_processor.add_custom_frame(upload_path, frame_path, file_id)
+            
+            # Clean up frame file
+            os.remove(frame_path)
+            
+            processing_type = "frame_custom"
+        else:
+            # Process with preset frame
+            if not frame_style:
+                frame_style = "modern"
+            output_path = await image_processor.add_frame(upload_path, frame_style, file_id)
+            processing_type = f"frame_{frame_style}"
         
         # Save to database if user is authenticated
         if user:
@@ -349,7 +374,7 @@ async def add_frame(request: Request, frame_style: str = Form(...), file: Upload
                 user_id=user.id,
                 original_filename=file.filename,
                 processed_filename=os.path.basename(output_path),
-                processing_type=f"frame_{frame_style}"
+                processing_type=processing_type
             )
             db.add(processed_image)
             db.commit()

@@ -42,6 +42,18 @@ function initializeEventListeners() {
         personSwapProcessBtn.addEventListener('click', handlePersonSwapProcess);
     }
 
+    // Frame type change
+    const frameTypeInputs = document.querySelectorAll('input[name="frameType"]');
+    frameTypeInputs.forEach(input => {
+        input.addEventListener('change', handleFrameTypeChange);
+    });
+
+    // Frame file upload
+    const frameFileInput = document.getElementById('frameFile');
+    if (frameFileInput) {
+        frameFileInput.addEventListener('change', handleFrameFileSelect);
+    }
+
     // Processing type change
     const processingTypeInputs = document.querySelectorAll('input[name="processingType"]');
     processingTypeInputs.forEach(input => {
@@ -392,15 +404,29 @@ async function processCreateCollage() {
 }
 
 async function processAddFrame() {
+    const frameType = document.querySelector('input[name="frameType"]:checked')?.value;
     const frameStyle = document.getElementById('frameStyle')?.value;
     const results = [];
+    
+    // Проверяем есть ли собственная рамка для загрузки
+    if (frameType === 'custom' && !frameFile) {
+        showAlert('Загрузите файл рамки', 'warning');
+        return results;
+    }
     
     updateProgress(10, 'Начинаем обработку...');
     
     for (let i = 0; i < selectedFiles.length; i++) {
         const formData = new FormData();
         formData.append('file', selectedFiles[i]);
-        formData.append('frame_style', frameStyle);
+        
+        if (frameType === 'custom') {
+            formData.append('frame_type', 'custom');
+            formData.append('frame_file', frameFile);
+        } else {
+            formData.append('frame_type', 'preset');
+            formData.append('frame_style', frameStyle);
+        }
         
         updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Добавление рамки (${i + 1}/${selectedFiles.length})...`);
         
@@ -524,6 +550,59 @@ async function handlePersonSwapProcess() {
             personSwapProcessBtn.disabled = false;
         }
     }
+}
+
+// Frame handling functions
+function handleFrameTypeChange() {
+    const frameType = document.querySelector('input[name="frameType"]:checked')?.value;
+    const presetOptions = document.getElementById('presetFrameOptions');
+    const customOptions = document.getElementById('customFrameOptions');
+    
+    if (presetOptions && customOptions) {
+        if (frameType === 'custom') {
+            presetOptions.classList.add('d-none');
+            customOptions.classList.remove('d-none');
+        } else {
+            presetOptions.classList.remove('d-none');
+            customOptions.classList.add('d-none');
+        }
+    }
+}
+
+let frameFile = null;
+
+function handleFrameFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        frameFile = file;
+        updateFrameFilePreview();
+    }
+}
+
+function updateFrameFilePreview() {
+    const preview = document.getElementById('frameFilePreview');
+    if (!preview || !frameFile) return;
+    
+    preview.innerHTML = `
+        <div class="file-item d-flex align-items-center justify-content-between p-2 border rounded">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-image me-2"></i>
+                <span>${frameFile.name}</span>
+                <small class="text-muted ms-2">(${formatFileSize(frameFile.size)})</small>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFrameFile()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+}
+
+function removeFrameFile() {
+    frameFile = null;
+    const preview = document.getElementById('frameFilePreview');
+    const input = document.getElementById('frameFile');
+    if (preview) preview.innerHTML = '';
+    if (input) input.value = '';
 }
 
 // Person swap file handling functions

@@ -272,17 +272,57 @@
                 <!-- Frame Options (hidden by default) -->
                 <div class="card mb-4 d-none" id="frameOptions">
                     <div class="card-header">
-                        <h6 class="mb-0">Настройки рамки</h6>
+                        <h5 class="mb-0">
+                            <i class="fas fa-image me-2"></i>
+                            Настройки рамки
+                        </h5>
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Стиль рамки</label>
-                            <select class="form-select" id="frameStyle">
-                                <option value="classic">Классическая</option>
-                                <option value="modern">Современная</option>
-                                <option value="vintage">Винтаж</option>
-                                <option value="elegant">Элегантная</option>
-                            </select>
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="form-label">Тип рамки:</label>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <input type="radio" class="btn-check" name="frameType" id="framePreset" value="preset" checked>
+                                <label class="btn btn-outline-primary w-100" for="framePreset">
+                                    <i class="fas fa-palette me-2"></i>
+                                    Готовые стили
+                                </label>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <input type="radio" class="btn-check" name="frameType" id="frameCustom" value="custom">
+                                <label class="btn btn-outline-primary w-100" for="frameCustom">
+                                    <i class="fas fa-upload me-2"></i>
+                                    Загрузить рамку
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Preset Frame Styles -->
+                        <div id="presetFrameOptions">
+                            <div class="mb-3">
+                                <label class="form-label">Стиль рамки</label>
+                                <select class="form-select" id="frameStyle">
+                                    <option value="classic">Классическая</option>
+                                    <option value="modern">Современная</option>
+                                    <option value="vintage">Винтаж</option>
+                                    <option value="elegant">Элегантная</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Custom Frame Upload -->
+                        <div id="customFrameOptions" class="d-none">
+                            <div class="upload-area" onclick="document.getElementById('frameFile').click()">
+                                <div class="upload-content text-center p-4">
+                                    <i class="fas fa-cloud-upload-alt mb-3" style="font-size: 2rem;"></i>
+                                    <p class="mb-2">Нажмите для загрузки файла рамки</p>
+                                    <p class="text-muted small">Поддерживаются PNG файлы с прозрачностью</p>
+                                    <input type="file" id="frameFile" accept="image/png" class="file-input">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm">Выбрать рамку</button>
+                                </div>
+                            </div>
+                            <div id="frameFilePreview" class="file-preview mt-3"></div>
                         </div>
                     </div>
                 </div>
