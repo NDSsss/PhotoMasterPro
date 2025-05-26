@@ -156,7 +156,7 @@ async def login(user: UserLogin):
 
 # Image processing endpoints
 @app.post("/api/remove-background")
-async def remove_background(request: Request, file: UploadFile = File(...)):
+async def remove_background(request: Request, file: UploadFile = File(...), method: str = Form("rembg")):
     user = await get_current_user_optional(request)
     
     if not file.content_type or not file.content_type.startswith('image/'):
@@ -171,8 +171,8 @@ async def remove_background(request: Request, file: UploadFile = File(...)):
             content = await file.read()
             buffer.write(content)
         
-        # Process image
-        output_path = await image_processor.remove_background(upload_path, file_id)
+        # Process image with selected method
+        output_path = await image_processor.remove_background(upload_path, file_id, method=method)
         
         # Save to database if user is authenticated
         if user:
@@ -181,7 +181,7 @@ async def remove_background(request: Request, file: UploadFile = File(...)):
                 user_id=user.id,
                 original_filename=file.filename,
                 processed_filename=os.path.basename(output_path),
-                processing_type="remove_background"
+                processing_type=f"remove_background_{method}"
             )
             db.add(processed_image)
             db.commit()
