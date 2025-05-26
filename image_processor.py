@@ -616,14 +616,11 @@ class ImageProcessor:
             raise
 
     async def smart_crop(self, image_path: str, aspect_ratio: str, file_id: str) -> str:
-        """Smart crop image with face detection and desired aspect ratio"""
+        """Smart crop image to desired aspect ratio with center focus"""
         try:
-            # Load image
-            img = cv2.imread(image_path)
-            if img is None:
-                raise ValueError("Could not load image")
-            
-            height, width = img.shape[:2]
+            # Load image with PIL
+            img = Image.open(image_path)
+            width, height = img.size
             
             # Parse aspect ratio
             aspect_ratios = {
@@ -638,94 +635,26 @@ class ImageProcessor:
             
             target_ratio = aspect_ratios.get(aspect_ratio, 1.0)
             
-            # Detect faces using OpenCV - try different paths for the cascade file
-            face_cascade_paths = [
-                '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
-                '/usr/local/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
-                'haarcascade_frontalface_default.xml'
-            ]
+            # Calculate crop dimensions based on target ratio
+            if target_ratio >= 1:  # Landscape or square
+                crop_height = min(height, int(width / target_ratio))
+                crop_width = int(crop_height * target_ratio)
+            else:  # Portrait
+                crop_width = min(width, int(height * target_ratio))
+                crop_height = int(crop_width / target_ratio)
             
-            # Try to get opencv data path
-            try:
-                import cv2
-                if hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
-                    face_cascade_paths.insert(0, cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            except:
-                pass
-            
-            face_cascade = None
-            for path in face_cascade_paths:
-                try:
-                    face_cascade = cv2.CascadeClassifier(path)
-                    if not face_cascade.empty():
-                        break
-                except:
-                    continue
-            
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
-            # If cascade is available, detect faces
-            faces = []
-            if face_cascade and not face_cascade.empty():
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-            
-            # Find best face (closest to horizontal center)
-            center_x = width // 2
-            best_face = None
-            min_distance = float('inf')
-            
-            if len(faces) > 0:
-                for (x, y, w, h) in faces:
-                    face_center_x = x + w // 2
-                    distance = abs(face_center_x - center_x)
-                    if distance < min_distance:
-                        min_distance = distance
-                        best_face = (x, y, w, h)
-                logger.info(f"Found {len(faces)} faces, using best face at center distance: {min_distance}")
-            else:
-                logger.info("No faces detected, using center crop")
-            
-            # Calculate crop area
-            if best_face is not None:
-                # Use face as center point
-                face_x, face_y, face_w, face_h = best_face
-                face_center_x = face_x + face_w // 2
-                face_center_y = face_y + face_h // 2
-                
-                # Calculate crop dimensions based on target ratio
-                if target_ratio >= 1:  # Landscape or square
-                    crop_height = min(height, int(width / target_ratio))
-                    crop_width = int(crop_height * target_ratio)
-                else:  # Portrait
-                    crop_width = min(width, int(height * target_ratio))
-                    crop_height = int(crop_width / target_ratio)
-                
-                # Center crop around face
-                left = max(0, min(face_center_x - crop_width // 2, width - crop_width))
-                top = max(0, min(face_center_y - crop_height // 2, height - crop_height))
-                
-            else:
-                # No face detected, use center crop
-                if target_ratio >= 1:  # Landscape or square
-                    crop_height = min(height, int(width / target_ratio))
-                    crop_width = int(crop_height * target_ratio)
-                else:  # Portrait
-                    crop_width = min(width, int(height * target_ratio))
-                    crop_height = int(crop_width / target_ratio)
-                
-                left = (width - crop_width) // 2
-                top = (height - crop_height) // 2
+            # Center crop
+            left = (width - crop_width) // 2
+            top = (height - crop_height) // 2
+            right = left + crop_width
+            bottom = top + crop_height
             
             # Crop image
-            cropped = img[top:top+crop_height, left:left+crop_width]
-            
-            # Convert back to PIL for saving
-            cropped_rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(cropped_rgb)
+            cropped = img.crop((left, top, right, bottom))
             
             # Save result
             output_path = f"processed/{file_id}_smart_crop_{aspect_ratio.replace(':', 'x')}.png"
-            pil_image.save(output_path, optimize=True, quality=95)
+            cropped.save(output_path, optimize=True, quality=95)
             logger.info(f"Smart crop completed: {output_path}")
             
             return output_path
