@@ -133,15 +133,45 @@
                 <!-- Person Swap Options (hidden by default) -->
                 <div class="card mb-4 d-none" id="personSwapOptions">
                     <div class="card-header">
-                        <h6 class="mb-0">Инструкция по подстановке людей</h6>
+                        <h6 class="mb-0">Подстановка людей на фоны</h6>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-info">
+                        <div class="alert alert-info mb-3">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Загрузите файлы в таком порядке:</strong><br>
-                            1. Сначала фотографии с людьми (которых нужно перенести)<br>
-                            2. Затем фотографии фонов (куда нужно поставить людей)<br>
-                            <small class="text-muted">Каждый человек будет поставлен на каждый фон</small>
+                            <strong>Каждый человек будет поставлен на каждый фон</strong><br>
+                            <small class="text-muted">Например: 2 человека + 3 фона = 6 результатов</small>
+                        </div>
+                        
+                        <!-- Загрузка фото людей -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-user me-2"></i>Фотографии людей
+                            </label>
+                            <div class="drop-zone" id="personDropZone">
+                                <div class="drop-zone-content">
+                                    <i class="fas fa-users drop-zone-icon"></i>
+                                    <p class="drop-zone-text">Перетащите фото людей сюда или нажмите для выбора</p>
+                                    <input type="file" id="personFiles" multiple accept="image/*" class="file-input">
+                                    <button type="button" class="btn btn-outline-primary btn-sm">Выбрать фото людей</button>
+                                </div>
+                            </div>
+                            <div id="personPreview" class="file-preview"></div>
+                        </div>
+                        
+                        <!-- Загрузка фонов -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-image me-2"></i>Фотографии фонов
+                            </label>
+                            <div class="drop-zone" id="backgroundDropZone">
+                                <div class="drop-zone-content">
+                                    <i class="fas fa-landscape drop-zone-icon"></i>
+                                    <p class="drop-zone-text">Перетащите фоны сюда или нажмите для выбора</p>
+                                    <input type="file" id="backgroundFiles" multiple accept="image/*" class="file-input">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm">Выбрать фоны</button>
+                                </div>
+                            </div>
+                            <div id="backgroundPreview" class="file-preview"></div>
                         </div>
                     </div>
                 </div>

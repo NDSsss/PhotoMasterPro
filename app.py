@@ -196,29 +196,46 @@ async def remove_background(request: Request, file: UploadFile = File(...), meth
         raise HTTPException(status_code=500, detail="Error processing image")
 
 @app.post("/api/person-swap")
-async def person_swap(request: Request, files: List[UploadFile] = File(...)):
+async def person_swap(
+    request: Request, 
+    person_files: List[UploadFile] = File(...), 
+    background_files: List[UploadFile] = File(...)
+):
     user = await get_current_user_optional(request)
     
-    if len(files) < 2:
-        raise HTTPException(status_code=400, detail="Minimum 2 images required for person swap")
+    if len(person_files) < 1 or len(background_files) < 1:
+        raise HTTPException(status_code=400, detail="Need at least 1 person photo and 1 background photo")
     
     try:
         # Save uploaded files
         file_id = str(uuid.uuid4())
-        upload_paths = []
+        person_paths = []
+        background_paths = []
         
-        for i, file in enumerate(files):
+        # Save person files
+        for i, file in enumerate(person_files):
             if not file.content_type or not file.content_type.startswith('image/'):
-                raise HTTPException(status_code=400, detail=f"File {i+1} must be an image")
+                raise HTTPException(status_code=400, detail=f"Person file {i+1} must be an image")
             
-            upload_path = f"uploads/{file_id}_{i}_{file.filename}"
+            upload_path = f"uploads/{file_id}_person_{i}_{file.filename}"
             with open(upload_path, "wb") as buffer:
                 content = await file.read()
                 buffer.write(content)
-            upload_paths.append(upload_path)
+            person_paths.append(upload_path)
+        
+        # Save background files
+        for i, file in enumerate(background_files):
+            if not file.content_type or not file.content_type.startswith('image/'):
+                raise HTTPException(status_code=400, detail=f"Background file {i+1} must be an image")
+            
+            upload_path = f"uploads/{file_id}_bg_{i}_{file.filename}"
+            with open(upload_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            background_paths.append(upload_path)
         
         # Process person swap
-        output_paths = await image_processor.person_swap(upload_paths, file_id)
+        output_paths = await image_processor.person_swap_separate(person_paths, background_paths, file_id)
         
         # Save to database if user is authenticated
         results = []

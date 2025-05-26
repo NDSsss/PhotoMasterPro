@@ -1,5 +1,7 @@
 // Global variables
 let selectedFiles = [];
+let personFiles = [];
+let backgroundFiles = [];
 let currentProcessing = null;
 
 // DOM elements
@@ -44,6 +46,33 @@ function initializeEventListeners() {
     const collageTypeSelect = document.getElementById('collageType');
     if (collageTypeSelect) {
         collageTypeSelect.addEventListener('change', handleCollageTypeChange);
+    }
+
+    // Person swap file inputs
+    const personFileInput = document.getElementById('personFiles');
+    const backgroundFileInput = document.getElementById('backgroundFiles');
+    const personDropZone = document.getElementById('personDropZone');
+    const backgroundDropZone = document.getElementById('backgroundDropZone');
+
+    if (personFileInput) {
+        personFileInput.addEventListener('change', (e) => handlePersonFileSelect(e));
+    }
+    if (backgroundFileInput) {
+        backgroundFileInput.addEventListener('change', (e) => handleBackgroundFileSelect(e));
+    }
+
+    // Person drop zone events
+    if (personDropZone) {
+        personDropZone.addEventListener('dragover', (e) => handlePersonDragOver(e));
+        personDropZone.addEventListener('drop', (e) => handlePersonDrop(e));
+        personDropZone.addEventListener('click', () => personFileInput?.click());
+    }
+
+    // Background drop zone events
+    if (backgroundDropZone) {
+        backgroundDropZone.addEventListener('dragover', (e) => handleBackgroundDragOver(e));
+        backgroundDropZone.addEventListener('drop', (e) => handleBackgroundDrop(e));
+        backgroundDropZone.addEventListener('click', () => backgroundFileInput?.click());
     }
 
     // Auth forms
@@ -404,10 +433,17 @@ async function processPersonSwap() {
     
     updateProgress(10, 'Начинаем подстановку людей...');
     
-    // Отправляем все файлы сразу для обработки
+    // Отправляем файлы людей и фонов отдельно
     const formData = new FormData();
-    selectedFiles.forEach((file, index) => {
-        formData.append('files', file);
+    
+    // Добавляем файлы людей
+    personFiles.forEach((file, index) => {
+        formData.append('person_files', file);
+    });
+    
+    // Добавляем файлы фонов
+    backgroundFiles.forEach((file, index) => {
+        formData.append('background_files', file);
     });
     
     updateProgress(50, 'Обрабатываем изображения...');
@@ -430,6 +466,129 @@ async function processPersonSwap() {
     updateProgress(100, 'Завершено!');
     
     return results;
+}
+
+// Person swap file handling functions
+function handlePersonFileSelect(event) {
+    const files = Array.from(event.target.files);
+    addPersonFiles(files);
+}
+
+function handleBackgroundFileSelect(event) {
+    const files = Array.from(event.target.files);
+    addBackgroundFiles(files);
+}
+
+function handlePersonDragOver(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+}
+
+function handlePersonDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    const files = Array.from(event.dataTransfer.files);
+    addPersonFiles(files);
+}
+
+function handleBackgroundDragOver(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+}
+
+function handleBackgroundDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    const files = Array.from(event.dataTransfer.files);
+    addBackgroundFiles(files);
+}
+
+function addPersonFiles(files) {
+    files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+            personFiles.push(file);
+        }
+    });
+    updatePersonPreview();
+    updatePersonSwapButton();
+}
+
+function addBackgroundFiles(files) {
+    files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+            backgroundFiles.push(file);
+        }
+    });
+    updateBackgroundPreview();
+    updatePersonSwapButton();
+}
+
+function updatePersonPreview() {
+    const preview = document.getElementById('personPreview');
+    if (!preview) return;
+    
+    preview.innerHTML = '';
+    personFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <img src="${URL.createObjectURL(file)}" alt="Person ${index + 1}">
+            <span class="file-name">${file.name}</span>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removePersonFile(${index})">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        preview.appendChild(fileItem);
+    });
+}
+
+function updateBackgroundPreview() {
+    const preview = document.getElementById('backgroundPreview');
+    if (!preview) return;
+    
+    preview.innerHTML = '';
+    backgroundFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <img src="${URL.createObjectURL(file)}" alt="Background ${index + 1}">
+            <span class="file-name">${file.name}</span>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeBackgroundFile(${index})">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        preview.appendChild(fileItem);
+    });
+}
+
+function removePersonFile(index) {
+    personFiles.splice(index, 1);
+    updatePersonPreview();
+    updatePersonSwapButton();
+}
+
+function removeBackgroundFile(index) {
+    backgroundFiles.splice(index, 1);
+    updateBackgroundPreview();
+    updatePersonSwapButton();
+}
+
+function updatePersonSwapButton() {
+    const processingType = document.querySelector('input[name="processingType"]:checked')?.value;
+    if (processingType === 'person-swap') {
+        const hasPersons = personFiles.length > 0;
+        const hasBackgrounds = backgroundFiles.length > 0;
+        
+        if (processBtn) {
+            if (hasPersons && hasBackgrounds) {
+                processBtn.classList.remove('d-none');
+                processBtn.disabled = false;
+            } else {
+                processBtn.classList.add('d-none');
+                processBtn.disabled = true;
+            }
+        }
+    }
 }
 
 // Progress handling
