@@ -195,8 +195,6 @@ async def remove_background(request: Request, file: UploadFile = File(...), meth
         logger.error(f"Error removing background: {e}")
         raise HTTPException(status_code=500, detail="Error processing image")
 
-from fastapi import Form
-
 @app.post("/api/person-swap")
 async def person_swap(
     request: Request,
