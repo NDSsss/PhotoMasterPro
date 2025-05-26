@@ -547,6 +547,47 @@ class ImageProcessor:
         except Exception as e:
             logger.error(f"Error adding frame: {e}")
             raise
+
+    async def add_custom_frame(self, image_path: str, frame_path: str, file_id: str) -> str:
+        """Add custom frame from uploaded file"""
+        try:
+            # Open main image
+            img = Image.open(image_path)
+            img = img.convert("RGBA")
+            
+            # Open frame image
+            frame = Image.open(frame_path)
+            frame = frame.convert("RGBA")
+            
+            # Resize frame to fit image with some padding
+            padding = 100  # Extra space for frame
+            target_size = (img.width + padding * 2, img.height + padding * 2)
+            frame = frame.resize(target_size, Image.Resampling.LANCZOS)
+            
+            # Create composite image
+            result = Image.new("RGBA", target_size, (255, 255, 255, 0))
+            
+            # Place original image in center
+            img_x = (target_size[0] - img.width) // 2
+            img_y = (target_size[1] - img.height) // 2
+            result.paste(img, (img_x, img_y), img)
+            
+            # Apply frame overlay
+            result = Image.alpha_composite(result, frame)
+            
+            # Convert to RGB for saving
+            final_result = Image.new("RGB", result.size, (255, 255, 255))
+            final_result.paste(result, mask=result.split()[3])
+            
+            # Save
+            output_path = f"processed/{file_id}_custom_framed.png"
+            final_result.save(output_path, optimize=True, quality=95)
+            logger.info(f"Custom frame added: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"Error adding custom frame: {e}")
+            raise
     
     async def retouch_image(self, image_path: str, file_id: str) -> str:
         """Perform automatic retouching"""
