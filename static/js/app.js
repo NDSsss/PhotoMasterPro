@@ -325,6 +325,9 @@ async function handleProcess() {
             case 'person-swap':
                 result = await processPersonSwap();
                 break;
+            case 'smart-crop':
+                result = await processSmartCrop();
+                break;
             default:
                 throw new Error('Неизвестный тип обработки');
         }
@@ -526,6 +529,40 @@ async function processPersonSwap() {
     updateProgress(100, 'Завершено!');
     
     return results;
+}
+
+async function processSmartCrop() {
+    const aspectRatio = document.getElementById('aspectRatio')?.value || '1:1';
+    const results = [];
+    
+    updateProgress(10, 'Начинаем умную обрезку...');
+    
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const formData = new FormData();
+        formData.append('file', selectedFiles[i]);
+        formData.append('aspect_ratio', aspectRatio);
+        
+        updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Умная обрезка (${i + 1}/${selectedFiles.length})...`);
+        
+        // Добавляем токен аутентификации если есть
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch('/api/smart-crop', {
+            method: 'POST',
+            headers: headers,
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            results.push(result);
+        }
+    }
+    
+    updateProgress(100, 'Завершено!');
+    
+    return results.length === 1 ? results[0] : results;
 }
 
 // Handle person swap process specifically

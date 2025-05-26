@@ -388,6 +388,50 @@ async def add_frame(
         logger.error(f"Error adding frame: {e}")
         raise HTTPException(status_code=500, detail="Error processing image")
 
+@app.post("/api/smart-crop")
+async def smart_crop(
+    request: Request,
+    aspect_ratio: str = Form(...),
+    file: UploadFile = File(...)
+):
+    user = await get_current_user_optional(request)
+    
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    try:
+        # Save uploaded file
+        file_id = str(uuid.uuid4())
+        upload_path = f"uploads/{file_id}_{file.filename}"
+        
+        with open(upload_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process smart crop
+        output_path = await image_processor.smart_crop(upload_path, aspect_ratio, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = get_db()
+            processed_image = ProcessedImage(
+                user_id=user.id,
+                original_filename=file.filename,
+                processed_filename=os.path.basename(output_path),
+                processing_type=f"smart_crop_{aspect_ratio.replace(':', 'x')}"
+            )
+            db.add(processed_image)
+            db.commit()
+        
+        # Clean up upload
+        os.remove(upload_path)
+        
+        return {"success": True, "output_path": f"/processed/{os.path.basename(output_path)}"}
+    
+    except Exception as e:
+        logger.error(f"Error in smart crop: {e}")
+        raise HTTPException(status_code=500, detail="Error processing image")
+
 @app.post("/api/retouch")
 async def retouch_image(request: Request, file: UploadFile = File(...)):
     user = await get_current_user_optional(request)
