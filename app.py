@@ -195,10 +195,12 @@ async def remove_background(request: Request, file: UploadFile = File(...), meth
         logger.error(f"Error removing background: {e}")
         raise HTTPException(status_code=500, detail="Error processing image")
 
+from fastapi import Form
+
 @app.post("/api/person-swap")
 async def person_swap(
-    request: Request, 
-    person_files: List[UploadFile] = File(...), 
+    request: Request,
+    person_files: List[UploadFile] = File(...),
     background_files: List[UploadFile] = File(...)
 ):
     user = await get_current_user_optional(request)
@@ -207,7 +209,6 @@ async def person_swap(
         raise HTTPException(status_code=400, detail="Need at least 1 person photo and 1 background photo")
     
     try:
-        # Save uploaded files
         file_id = str(uuid.uuid4())
         person_paths = []
         background_paths = []
