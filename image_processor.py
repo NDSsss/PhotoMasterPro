@@ -638,22 +638,52 @@ class ImageProcessor:
             
             target_ratio = aspect_ratios.get(aspect_ratio, 1.0)
             
-            # Detect faces using OpenCV
-            face_cascade = cv2.CascadeClassifier('/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml')
+            # Detect faces using OpenCV - try different paths for the cascade file
+            face_cascade_paths = [
+                '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
+                '/usr/local/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
+                'haarcascade_frontalface_default.xml'
+            ]
+            
+            # Try to get opencv data path
+            try:
+                import cv2
+                if hasattr(cv2, 'data') and hasattr(cv2.data, 'haarcascades'):
+                    face_cascade_paths.insert(0, cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            except:
+                pass
+            
+            face_cascade = None
+            for path in face_cascade_paths:
+                try:
+                    face_cascade = cv2.CascadeClassifier(path)
+                    if not face_cascade.empty():
+                        break
+                except:
+                    continue
+            
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            
+            # If cascade is available, detect faces
+            faces = []
+            if face_cascade and not face_cascade.empty():
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
             
             # Find best face (closest to horizontal center)
             center_x = width // 2
             best_face = None
             min_distance = float('inf')
             
-            for (x, y, w, h) in faces:
-                face_center_x = x + w // 2
-                distance = abs(face_center_x - center_x)
-                if distance < min_distance:
-                    min_distance = distance
-                    best_face = (x, y, w, h)
+            if len(faces) > 0:
+                for (x, y, w, h) in faces:
+                    face_center_x = x + w // 2
+                    distance = abs(face_center_x - center_x)
+                    if distance < min_distance:
+                        min_distance = distance
+                        best_face = (x, y, w, h)
+                logger.info(f"Found {len(faces)} faces, using best face at center distance: {min_distance}")
+            else:
+                logger.info("No faces detected, using center crop")
             
             # Calculate crop area
             if best_face is not None:
