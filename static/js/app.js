@@ -246,6 +246,7 @@ async function handleProcess() {
                 throw new Error('Неизвестный тип обработки');
         }
         
+        console.log('Showing results:', result);
         showResults(result);
         
     } catch (error) {
@@ -402,15 +403,23 @@ function showResults(result) {
     
     const resultsContent = document.getElementById('resultsContent');
     
+    console.log('showResults received:', result);
+    
     // Поддержка как одного результата, так и массива результатов
     const results = Array.isArray(result) ? result : [result];
+    
+    console.log('Processing results array:', results);
     
     let imagesHTML = '';
     let downloadButtons = '';
     
     results.forEach((res, index) => {
+        console.log(`Processing result ${index}:`, res);
+        
         // Поддержка разных форматов ответа API
         const outputPath = res.output_path || res.processed_path || (res.success && res.output_path);
+        
+        console.log(`Output path for result ${index}:`, outputPath);
         
         if (outputPath) {
             imagesHTML += `
@@ -426,6 +435,8 @@ function showResults(result) {
             `;
         }
     });
+    
+    console.log('Generated HTML:', { imagesHTML, downloadButtons });
     
     resultsContent.innerHTML = `
         <div class="text-center">
