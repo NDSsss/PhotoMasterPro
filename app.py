@@ -41,7 +41,7 @@ templates = Jinja2Templates(directory="templates")
 
 # Initialize components
 image_processor = ImageProcessor()
-telegram_bot = TelegramBot()
+# telegram_bot = TelegramBot()  # Временно отключен
 
 # Models
 class UserCreate(BaseModel):
@@ -160,7 +160,7 @@ async def login(user: UserLogin):
 async def remove_background(request: Request, file: UploadFile = File(...)):
     user = await get_current_user_optional(request)
     
-    if not file.content_type.startswith('image/'):
+    if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
     try:
@@ -219,7 +219,7 @@ async def create_collage(
         upload_paths = []
         
         for i, file in enumerate(files):
-            if not file.content_type.startswith('image/'):
+            if not file.content_type or not file.content_type.startswith('image/'):
                 raise HTTPException(status_code=400, detail="All files must be images")
             
             upload_path = f"uploads/{file_id}_{i}_{file.filename}"
@@ -257,7 +257,7 @@ async def create_collage(
 async def add_frame(request: Request, frame_style: str = Form(...), file: UploadFile = File(...)):
     user = await get_current_user_optional(request)
     
-    if not file.content_type.startswith('image/'):
+    if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
     try:
@@ -297,7 +297,7 @@ async def add_frame(request: Request, frame_style: str = Form(...), file: Upload
 async def retouch_image(request: Request, file: UploadFile = File(...)):
     user = await get_current_user_optional(request)
     
-    if not file.content_type.startswith('image/'):
+    if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
     try:
@@ -339,15 +339,14 @@ async def get_my_images(user: User = Depends(get_current_user)):
     images = db.query(ProcessedImage).filter(ProcessedImage.user_id == user.id).order_by(ProcessedImage.created_at.desc()).all()
     return {"images": [{"id": img.id, "filename": img.processed_filename, "type": img.processing_type, "created_at": img.created_at} for img in images]}
 
-# Start Telegram bot in background
-def start_telegram_bot():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(telegram_bot.start())
+# Telegram bot временно отключен
+# def start_telegram_bot():
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     loop.run_until_complete(telegram_bot.start())
 
-# Start the bot in a separate thread
-telegram_thread = threading.Thread(target=start_telegram_bot, daemon=True)
-telegram_thread.start()
+# telegram_thread = threading.Thread(target=start_telegram_bot, daemon=True)
+# telegram_thread.start()
 
 # Create directories
 os.makedirs("uploads", exist_ok=True)
