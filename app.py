@@ -195,6 +195,61 @@ async def remove_background(request: Request, file: UploadFile = File(...), meth
         logger.error(f"Error removing background: {e}")
         raise HTTPException(status_code=500, detail="Error processing image")
 
+@app.post("/api/person-swap")
+async def person_swap(request: Request, files: List[UploadFile] = File(...)):
+    user = await get_current_user_optional(request)
+    
+    if len(files) < 2:
+        raise HTTPException(status_code=400, detail="Minimum 2 images required for person swap")
+    
+    try:
+        # Save uploaded files
+        file_id = str(uuid.uuid4())
+        upload_paths = []
+        
+        for i, file in enumerate(files):
+            if not file.content_type or not file.content_type.startswith('image/'):
+                raise HTTPException(status_code=400, detail=f"File {i+1} must be an image")
+            
+            upload_path = f"uploads/{file_id}_{i}_{file.filename}"
+            with open(upload_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            upload_paths.append(upload_path)
+        
+        # Process person swap
+        output_paths = await image_processor.person_swap(upload_paths, file_id)
+        
+        # Save to database if user is authenticated
+        results = []
+        for i, output_path in enumerate(output_paths):
+            if user:
+                db = get_db()
+                processed_image = ProcessedImage(
+                    user_id=user.id,
+                    original_filename=f"person_swap_{i+1}",
+                    processed_filename=os.path.basename(output_path),
+                    processing_type="person_swap"
+                )
+                db.add(processed_image)
+                db.commit()
+            
+            results.append({
+                "success": True,
+                "output_path": f"/processed/{os.path.basename(output_path)}"
+            })
+        
+        # Clean up uploads
+        for upload_path in upload_paths:
+            if os.path.exists(upload_path):
+                os.remove(upload_path)
+        
+        return {"success": True, "results": results}
+    
+    except Exception as e:
+        logger.error(f"Error in person swap: {e}")
+        raise HTTPException(status_code=500, detail="Error processing images")
+
 @app.post("/api/create-collage")
 async def create_collage(
     request: Request,

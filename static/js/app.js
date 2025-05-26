@@ -185,11 +185,16 @@ function handleProcessingTypeChange() {
     
     // Show/hide options
     const backgroundOptions = document.getElementById('backgroundOptions');
+    const personSwapOptions = document.getElementById('personSwapOptions');
     const collageOptions = document.getElementById('collageOptions');
     const frameOptions = document.getElementById('frameOptions');
     
     if (backgroundOptions) {
         backgroundOptions.classList.toggle('d-none', processingType !== 'remove-background');
+    }
+    
+    if (personSwapOptions) {
+        personSwapOptions.classList.toggle('d-none', processingType !== 'person-swap');
     }
     
     if (collageOptions) {
@@ -241,6 +246,9 @@ async function handleProcess() {
                 break;
             case 'retouch':
                 result = await processRetouch();
+                break;
+            case 'person-swap':
+                result = await processPersonSwap();
                 break;
             default:
                 throw new Error('Неизвестный тип обработки');
@@ -389,6 +397,39 @@ async function processRetouch() {
     updateProgress(100, 'Завершено!');
     
     return results.length === 1 ? results[0] : results;
+}
+
+async function processPersonSwap() {
+    const results = [];
+    
+    updateProgress(10, 'Начинаем подстановку людей...');
+    
+    // Отправляем все файлы сразу для обработки
+    const formData = new FormData();
+    selectedFiles.forEach((file, index) => {
+        formData.append('files', file);
+    });
+    
+    updateProgress(50, 'Обрабатываем изображения...');
+    
+    // Добавляем токен аутентификации если есть
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    const response = await fetch('/api/person-swap', {
+        method: 'POST',
+        headers: headers,
+        body: formData
+    });
+    
+    if (response.ok) {
+        const result = await response.json();
+        results.push(...result.results);
+    }
+    
+    updateProgress(100, 'Завершено!');
+    
+    return results;
 }
 
 // Progress handling
@@ -552,6 +593,8 @@ async function handleRegister(event) {
             showAlert('Регистрация выполнена успешно!', 'success');
             bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
             updateAuthStatus(true);
+            // Переходим на страницу загрузки после успешной регистрации
+            window.location.href = '/upload';
         } else {
             showAlert(data.detail || 'Ошибка регистрации', 'danger');
         }

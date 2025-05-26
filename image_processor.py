@@ -136,6 +136,91 @@ class ImageProcessor:
             # Fallback to regular rembg
             logger.info("Falling back to regular rembg method")
             return await self._remove_background_rembg(input_path, file_id)
+
+    async def person_swap(self, image_paths: list, file_id: str) -> list:
+        """Подставляет людей с первых фото на фоны с остальных фото"""
+        try:
+            # Разделим изображения на людей и фоны (первая половина - люди, вторая - фоны)
+            mid_point = len(image_paths) // 2
+            person_images = image_paths[:mid_point] if mid_point > 0 else [image_paths[0]]
+            background_images = image_paths[mid_point:] if mid_point > 0 else image_paths[1:]
+            
+            if not background_images:
+                background_images = image_paths[1:] if len(image_paths) > 1 else []
+            
+            output_paths = []
+            
+            # Для каждого человека на каждом фоне
+            for person_idx, person_path in enumerate(person_images):
+                for bg_idx, bg_path in enumerate(background_images):
+                    result_path = await self._swap_person_to_background(
+                        person_path, bg_path, file_id, person_idx, bg_idx
+                    )
+                    output_paths.append(result_path)
+            
+            logger.info(f"Person swap completed: {len(output_paths)} images created")
+            return output_paths
+            
+        except Exception as e:
+            logger.error(f"Error in person swap: {e}")
+            raise
+
+    async def _swap_person_to_background(self, person_path: str, background_path: str, 
+                                       file_id: str, person_idx: int, bg_idx: int) -> str:
+        """Подставляет одного человека на один фон"""
+        try:
+            from PIL import Image, ImageEnhance, ImageFilter
+            import cv2
+            import numpy as np
+            
+            # Загружаем изображения
+            person_img = Image.open(person_path).convert("RGBA")
+            background_img = Image.open(background_path).convert("RGBA")
+            
+            # Удаляем фон у человека
+            with open(person_path, 'rb') as f:
+                person_data = f.read()
+            
+            remove_func = get_rembg()
+            person_no_bg_data = remove_func(person_data)
+            
+            # Конвертируем в PIL Image
+            import io
+            person_no_bg = Image.open(io.BytesIO(person_no_bg_data)).convert("RGBA")
+            
+            # Подгоняем размер человека под фон (например, 30% от высоты фона)
+            bg_width, bg_height = background_img.size
+            target_height = int(bg_height * 0.6)  # 60% от высоты фона
+            
+            # Пропорционально изменяем размер человека
+            person_width, person_height = person_no_bg.size
+            scale_factor = target_height / person_height
+            new_person_width = int(person_width * scale_factor)
+            
+            person_resized = person_no_bg.resize((new_person_width, target_height), Image.Resampling.LANCZOS)
+            
+            # Позиционируем человека (по центру по X, внизу по Y)
+            x_pos = (bg_width - new_person_width) // 2
+            y_pos = bg_height - target_height - 20  # небольшой отступ снизу
+            
+            # Создаем итоговое изображение
+            result_img = background_img.copy()
+            result_img.paste(person_resized, (x_pos, y_pos), person_resized)
+            
+            # Применяем небольшую коррекцию цвета для лучшего сочетания
+            enhancer = ImageEnhance.Color(result_img)
+            result_img = enhancer.enhance(1.1)
+            
+            # Сохраняем результат
+            output_path = f"processed/{file_id}_person_{person_idx}_bg_{bg_idx}_swap.png"
+            result_img.convert("RGB").save(output_path, "PNG")
+            
+            logger.info(f"Person swap created: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"Error swapping person to background: {e}")
+            raise
     
     async def create_collage(self, image_paths: list, collage_type: str, caption: str, file_id: str) -> str:
         """Create photo collage based on type"""
