@@ -242,6 +242,7 @@ function handleProcessingTypeChange() {
     const personSwapOptions = document.getElementById('personSwapOptions');
     const collageOptions = document.getElementById('collageOptions');
     const frameOptions = document.getElementById('frameOptions');
+    const smartCropOptions = document.getElementById('smartCropOptions');
     const uploadCard = document.querySelector('.card:has(#fileInput)') || document.querySelector('.upload-area')?.closest('.card');
     
     if (backgroundOptions) {
@@ -258,6 +259,10 @@ function handleProcessingTypeChange() {
     
     if (frameOptions) {
         frameOptions.classList.toggle('d-none', processingType !== 'add-frame');
+    }
+    
+    if (smartCropOptions) {
+        smartCropOptions.classList.toggle('d-none', processingType !== 'smart-crop');
     }
     
     // Скрываем стандартную форму загрузки для подстановки людей

@@ -551,13 +551,39 @@ class ImageProcessor:
     async def add_custom_frame(self, image_path: str, frame_path: str, file_id: str) -> str:
         """Add custom frame from uploaded file"""
         try:
-            # Open main image
-            img = Image.open(image_path)
-            img = img.convert("RGBA")
-            
-            # Open frame image
+            # Open frame image to get its aspect ratio
             frame = Image.open(frame_path)
             frame = frame.convert("RGBA")
+            frame_ratio = frame.width / frame.height
+            
+            # Determine aspect ratio string for smart crop
+            if 0.95 <= frame_ratio <= 1.05:
+                aspect_ratio = "1:1"
+            elif 1.25 <= frame_ratio <= 1.4:
+                aspect_ratio = "4:3"
+            elif 0.71 <= frame_ratio <= 0.8:
+                aspect_ratio = "3:4"
+            elif 1.7 <= frame_ratio <= 1.8:
+                aspect_ratio = "16:9"
+            elif 0.55 <= frame_ratio <= 0.6:
+                aspect_ratio = "9:16"
+            elif 1.45 <= frame_ratio <= 1.55:
+                aspect_ratio = "3:2"
+            elif 0.65 <= frame_ratio <= 0.7:
+                aspect_ratio = "2:3"
+            else:
+                aspect_ratio = "1:1"  # Default to square
+            
+            # Smart crop the image to match frame proportions
+            cropped_path = await self.smart_crop(image_path, aspect_ratio, file_id + "_temp")
+            
+            # Open cropped image
+            img = Image.open(cropped_path)
+            img = img.convert("RGBA")
+            
+            # Clean up temporary cropped file
+            import os
+            os.remove(cropped_path)
             
             # Resize frame to fit image with some padding
             padding = 100  # Extra space for frame
@@ -587,6 +613,95 @@ class ImageProcessor:
             
         except Exception as e:
             logger.error(f"Error adding custom frame: {e}")
+            raise
+
+    async def smart_crop(self, image_path: str, aspect_ratio: str, file_id: str) -> str:
+        """Smart crop image with face detection and desired aspect ratio"""
+        try:
+            # Load image
+            img = cv2.imread(image_path)
+            if img is None:
+                raise ValueError("Could not load image")
+            
+            height, width = img.shape[:2]
+            
+            # Parse aspect ratio
+            aspect_ratios = {
+                "1:1": 1.0,
+                "4:3": 4/3,
+                "3:4": 3/4,
+                "16:9": 16/9,
+                "9:16": 9/16,
+                "3:2": 3/2,
+                "2:3": 2/3
+            }
+            
+            target_ratio = aspect_ratios.get(aspect_ratio, 1.0)
+            
+            # Detect faces using OpenCV
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            
+            # Find best face (closest to horizontal center)
+            center_x = width // 2
+            best_face = None
+            min_distance = float('inf')
+            
+            for (x, y, w, h) in faces:
+                face_center_x = x + w // 2
+                distance = abs(face_center_x - center_x)
+                if distance < min_distance:
+                    min_distance = distance
+                    best_face = (x, y, w, h)
+            
+            # Calculate crop area
+            if best_face is not None:
+                # Use face as center point
+                face_x, face_y, face_w, face_h = best_face
+                face_center_x = face_x + face_w // 2
+                face_center_y = face_y + face_h // 2
+                
+                # Calculate crop dimensions based on target ratio
+                if target_ratio >= 1:  # Landscape or square
+                    crop_height = min(height, int(width / target_ratio))
+                    crop_width = int(crop_height * target_ratio)
+                else:  # Portrait
+                    crop_width = min(width, int(height * target_ratio))
+                    crop_height = int(crop_width / target_ratio)
+                
+                # Center crop around face
+                left = max(0, min(face_center_x - crop_width // 2, width - crop_width))
+                top = max(0, min(face_center_y - crop_height // 2, height - crop_height))
+                
+            else:
+                # No face detected, use center crop
+                if target_ratio >= 1:  # Landscape or square
+                    crop_height = min(height, int(width / target_ratio))
+                    crop_width = int(crop_height * target_ratio)
+                else:  # Portrait
+                    crop_width = min(width, int(height * target_ratio))
+                    crop_height = int(crop_width / target_ratio)
+                
+                left = (width - crop_width) // 2
+                top = (height - crop_height) // 2
+            
+            # Crop image
+            cropped = img[top:top+crop_height, left:left+crop_width]
+            
+            # Convert back to PIL for saving
+            cropped_rgb = cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(cropped_rgb)
+            
+            # Save result
+            output_path = f"processed/{file_id}_smart_crop_{aspect_ratio.replace(':', 'x')}.png"
+            pil_image.save(output_path, optimize=True, quality=95)
+            logger.info(f"Smart crop completed: {output_path}")
+            
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"Error in smart crop: {e}")
             raise
     
     async def retouch_image(self, image_path: str, file_id: str) -> str:
