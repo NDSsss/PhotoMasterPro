@@ -271,8 +271,13 @@ async function processRemoveBackground() {
         
         updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Удаление фона (${i + 1}/${selectedFiles.length})...`);
         
-        const response = await fetchWithAuth('/api/remove-background', {
+        // Добавляем токен аутентификации если есть
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch('/api/remove-background', {
             method: 'POST',
+            headers: headers,
             body: formData
         });
         
@@ -283,7 +288,8 @@ async function processRemoveBackground() {
             console.log(`Received result ${i + 1}:`, result);
             results.push(result);
         } else {
-            console.error(`Error processing file ${i + 1}:`, response.status, await response.text());
+            const errorText = await response.text();
+            console.error(`Error processing file ${i + 1}:`, response.status, errorText);
         }
     }
     
@@ -332,8 +338,13 @@ async function processAddFrame() {
         
         updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Добавление рамки (${i + 1}/${selectedFiles.length})...`);
         
-        const response = await fetchWithAuth('/api/add-frame', {
+        // Добавляем токен аутентификации если есть
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch('/api/add-frame', {
             method: 'POST',
+            headers: headers,
             body: formData
         });
         
@@ -359,8 +370,13 @@ async function processRetouch() {
         
         updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Ретушь изображения (${i + 1}/${selectedFiles.length})...`);
         
-        const response = await fetchWithAuth('/api/retouch', {
+        // Добавляем токен аутентификации если есть
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        const response = await fetch('/api/retouch', {
             method: 'POST',
+            headers: headers,
             body: formData
         });
         
