@@ -257,7 +257,7 @@ async def person_swap(
             })
         
         # Clean up uploads
-        for upload_path in upload_paths:
+        for upload_path in person_paths + background_paths:
             if os.path.exists(upload_path):
                 os.remove(upload_path)
         

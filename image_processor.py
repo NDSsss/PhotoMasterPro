@@ -165,6 +165,26 @@ class ImageProcessor:
             logger.error(f"Error in person swap: {e}")
             raise
 
+    async def person_swap_separate(self, person_paths: list, background_paths: list, file_id: str) -> list:
+        """Подставляет каждого человека на каждый фон (отдельные массивы)"""
+        try:
+            output_paths = []
+            
+            # Для каждого человека на каждом фоне
+            for person_idx, person_path in enumerate(person_paths):
+                for bg_idx, bg_path in enumerate(background_paths):
+                    result_path = await self._swap_person_to_background(
+                        person_path, bg_path, file_id, person_idx, bg_idx
+                    )
+                    output_paths.append(result_path)
+            
+            logger.info(f"Person swap completed: {len(output_paths)} images created")
+            return output_paths
+            
+        except Exception as e:
+            logger.error(f"Error in person swap separate: {e}")
+            raise
+
     async def _swap_person_to_background(self, person_path: str, background_path: str, 
                                        file_id: str, person_idx: int, bg_idx: int) -> str:
         """Подставляет одного человека на один фон"""
