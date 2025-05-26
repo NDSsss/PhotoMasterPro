@@ -184,8 +184,13 @@ function handleProcessingTypeChange() {
     const processingType = document.querySelector('input[name="processingType"]:checked')?.value;
     
     // Show/hide options
+    const backgroundOptions = document.getElementById('backgroundOptions');
     const collageOptions = document.getElementById('collageOptions');
     const frameOptions = document.getElementById('frameOptions');
+    
+    if (backgroundOptions) {
+        backgroundOptions.classList.toggle('d-none', processingType !== 'remove-background');
+    }
     
     if (collageOptions) {
         collageOptions.classList.toggle('d-none', processingType !== 'create-collage');
@@ -253,21 +258,32 @@ async function handleProcess() {
 }
 
 async function processRemoveBackground() {
-    updateProgress(25, 'Загрузка изображения...');
+    const bgMethod = document.querySelector('input[name="bgMethod"]:checked')?.value || 'rembg';
+    const results = [];
     
-    const formData = new FormData();
-    formData.append('file', selectedFiles[0]);
+    updateProgress(10, 'Начинаем обработку...');
     
-    updateProgress(50, 'Удаление фона...');
-    
-    const response = await fetchWithAuth('/api/remove-background', {
-        method: 'POST',
-        body: formData
-    });
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const formData = new FormData();
+        formData.append('file', selectedFiles[i]);
+        formData.append('method', bgMethod);
+        
+        updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Удаление фона (${i + 1}/${selectedFiles.length})...`);
+        
+        const response = await fetchWithAuth('/api/remove-background', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            results.push(result);
+        }
+    }
     
     updateProgress(100, 'Завершено!');
     
-    return response;
+    return results.length === 1 ? results[0] : results;
 }
 
 async function processCreateCollage() {
@@ -298,41 +314,58 @@ async function processCreateCollage() {
 
 async function processAddFrame() {
     const frameStyle = document.getElementById('frameStyle')?.value;
+    const results = [];
     
-    updateProgress(30, 'Добавление рамки...');
+    updateProgress(10, 'Начинаем обработку...');
     
-    const formData = new FormData();
-    formData.append('file', selectedFiles[0]);
-    formData.append('frame_style', frameStyle);
-    
-    updateProgress(70, 'Обработка изображения...');
-    
-    const response = await fetchWithAuth('/api/add-frame', {
-        method: 'POST',
-        body: formData
-    });
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const formData = new FormData();
+        formData.append('file', selectedFiles[i]);
+        formData.append('frame_style', frameStyle);
+        
+        updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Добавление рамки (${i + 1}/${selectedFiles.length})...`);
+        
+        const response = await fetchWithAuth('/api/add-frame', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            results.push(result);
+        }
+    }
     
     updateProgress(100, 'Завершено!');
     
-    return response;
+    return results.length === 1 ? results[0] : results;
 }
 
 async function processRetouch() {
-    updateProgress(25, 'Анализ изображения...');
+    const results = [];
     
-    const formData = new FormData();
-    formData.append('file', selectedFiles[0]);
+    updateProgress(10, 'Начинаем обработку...');
     
-    updateProgress(75, 'Применение ретуши...');
-    
-    const response = await fetchWithAuth('/api/retouch', {
-        method: 'POST',
-        body: formData
-    });
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const formData = new FormData();
+        formData.append('file', selectedFiles[i]);
+        
+        updateProgress(20 + (60 * (i + 1) / selectedFiles.length), `Ретушь изображения (${i + 1}/${selectedFiles.length})...`);
+        
+        const response = await fetchWithAuth('/api/retouch', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            results.push(result);
+        }
+    }
     
     updateProgress(100, 'Завершено!');
     
-    return response;
+    return results.length === 1 ? results[0] : results;
 }
 
 // Progress handling
@@ -369,14 +402,35 @@ function showResults(result) {
     
     const resultsContent = document.getElementById('resultsContent');
     
+    // Поддержка как одного результата, так и массива результатов
+    const results = Array.isArray(result) ? result : [result];
+    
+    let imagesHTML = '';
+    let downloadButtons = '';
+    
+    results.forEach((res, index) => {
+        if (res.output_path) {
+            imagesHTML += `
+                <div class="col-md-6 mb-3">
+                    <img src="${res.output_path}" class="result-image w-100" alt="Обработанное изображение ${index + 1}">
+                </div>
+            `;
+            downloadButtons += `
+                <a href="${res.output_path}" download class="btn btn-primary me-2 mb-2">
+                    <i class="fas fa-download me-2"></i>
+                    Скачать ${results.length > 1 ? `фото ${index + 1}` : 'результат'}
+                </a>
+            `;
+        }
+    });
+    
     resultsContent.innerHTML = `
         <div class="text-center">
-            <img src="${result.output_path}" class="result-image mb-3" alt="Обработанное изображение">
-            <div class="d-flex justify-content-center gap-2">
-                <a href="${result.output_path}" download class="btn btn-primary">
-                    <i class="fas fa-download me-2"></i>
-                    Скачать результат
-                </a>
+            <div class="row justify-content-center mb-3">
+                ${imagesHTML}
+            </div>
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+                ${downloadButtons}
                 <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
                     <i class="fas fa-redo me-2"></i>
                     Обработать еще
