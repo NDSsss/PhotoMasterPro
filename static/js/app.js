@@ -409,14 +409,17 @@ function showResults(result) {
     let downloadButtons = '';
     
     results.forEach((res, index) => {
-        if (res.output_path) {
+        // Поддержка разных форматов ответа API
+        const outputPath = res.output_path || res.processed_path || (res.success && res.output_path);
+        
+        if (outputPath) {
             imagesHTML += `
                 <div class="col-md-6 mb-3">
-                    <img src="${res.output_path}" class="result-image w-100" alt="Обработанное изображение ${index + 1}">
+                    <img src="${outputPath}" class="result-image w-100" alt="Обработанное изображение ${index + 1}">
                 </div>
             `;
             downloadButtons += `
-                <a href="${res.output_path}" download class="btn btn-primary me-2 mb-2">
+                <a href="${outputPath}" download class="btn btn-primary me-2 mb-2">
                     <i class="fas fa-download me-2"></i>
                     Скачать ${results.length > 1 ? `фото ${index + 1}` : 'результат'}
                 </a>
