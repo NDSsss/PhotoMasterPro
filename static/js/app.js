@@ -179,6 +179,13 @@ function updateProcessButton() {
     if (!processBtn) return;
     
     const processingType = document.querySelector('input[name="processingType"]:checked')?.value;
+    
+    // Для подстановки людей используем отдельную логику
+    if (processingType === 'person-swap') {
+        updatePersonSwapButton();
+        return;
+    }
+    
     const requiredFiles = getRequiredFilesCount(processingType);
     
     if (selectedFiles.length >= requiredFiles) {
