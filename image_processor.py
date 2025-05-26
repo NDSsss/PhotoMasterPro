@@ -616,11 +616,14 @@ class ImageProcessor:
             raise
 
     async def smart_crop(self, image_path: str, aspect_ratio: str, file_id: str) -> str:
-        """Smart crop image to desired aspect ratio with center focus"""
+        """Smart crop image to desired aspect ratio with face detection focus"""
         try:
-            # Load image with PIL
+            # Load image with PIL and OpenCV
             img = Image.open(image_path)
             width, height = img.size
+            
+            # Convert to OpenCV format for face detection
+            img_cv = cv2.imread(image_path)
             
             # Parse aspect ratio
             aspect_ratios = {
@@ -643,9 +646,56 @@ class ImageProcessor:
                 crop_width = min(width, int(height * target_ratio))
                 crop_height = int(crop_width / target_ratio)
             
-            # Center crop
-            left = (width - crop_width) // 2
-            top = (height - crop_height) // 2
+            # Try to find faces using OpenCV
+            face_center_x, face_center_y = None, None
+            try:
+                # Load face cascade
+                face_cascade = cv2.CascadeClassifier()
+                cascade_loaded = False
+                
+                # Try to load face cascade from different locations
+                for cascade_file in ['/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml']:
+                    if face_cascade.load(cascade_file):
+                        cascade_loaded = True
+                        break
+                
+                if cascade_loaded and img_cv is not None:
+                    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+                    
+                    if len(faces) > 0:
+                        # Find the face closest to horizontal center
+                        center_x = width // 2
+                        best_face = None
+                        min_distance = float('inf')
+                        
+                        for (x, y, w, h) in faces:
+                            face_x = x + w // 2
+                            distance = abs(face_x - center_x)
+                            if distance < min_distance:
+                                min_distance = distance
+                                best_face = (x, y, w, h)
+                        
+                        if best_face:
+                            x, y, w, h = best_face
+                            face_center_x = x + w // 2
+                            face_center_y = y + h // 2
+                            logger.info(f"Face detected at ({face_center_x}, {face_center_y})")
+            except Exception as e:
+                logger.info(f"Face detection failed: {e}, using center crop")
+            
+            # Calculate crop position
+            if face_center_x is not None and face_center_y is not None:
+                # Center crop around face
+                left = max(0, min(face_center_x - crop_width // 2, width - crop_width))
+                top = max(0, min(face_center_y - crop_height // 2, height - crop_height))
+                logger.info(f"Cropping around face: left={left}, top={top}")
+            else:
+                # Fall back to center crop
+                left = (width - crop_width) // 2
+                top = (height - crop_height) // 2
+                logger.info("Using center crop")
+            
             right = left + crop_width
             bottom = top + crop_height
             
