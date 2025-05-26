@@ -36,6 +36,12 @@ function initializeEventListeners() {
         processBtn.addEventListener('click', handleProcess);
     }
 
+    // Person swap process button
+    const personSwapProcessBtn = document.getElementById('personSwapProcessBtn');
+    if (personSwapProcessBtn) {
+        personSwapProcessBtn.addEventListener('click', handlePersonSwapProcess);
+    }
+
     // Processing type change
     const processingTypeInputs = document.querySelectorAll('input[name="processingType"]');
     processingTypeInputs.forEach(input => {
@@ -224,6 +230,7 @@ function handleProcessingTypeChange() {
     const personSwapOptions = document.getElementById('personSwapOptions');
     const collageOptions = document.getElementById('collageOptions');
     const frameOptions = document.getElementById('frameOptions');
+    const uploadCard = document.querySelector('.card:has(#fileInput)') || document.querySelector('.upload-area')?.closest('.card');
     
     if (backgroundOptions) {
         backgroundOptions.classList.toggle('d-none', processingType !== 'remove-background');
@@ -239,6 +246,21 @@ function handleProcessingTypeChange() {
     
     if (frameOptions) {
         frameOptions.classList.toggle('d-none', processingType !== 'add-frame');
+    }
+    
+    // Скрываем стандартную форму загрузки для подстановки людей
+    const fileUploadCard = document.querySelector('.card:has(#fileInput)');
+    if (!fileUploadCard) {
+        // Поиск по тексту заголовка если селектор не работает
+        const allCards = document.querySelectorAll('.card');
+        allCards.forEach(card => {
+            const header = card.querySelector('.card-header');
+            if (header && header.textContent.includes('Загрузить фотографии')) {
+                card.classList.toggle('d-none', processingType === 'person-swap');
+            }
+        });
+    } else {
+        fileUploadCard.classList.toggle('d-none', processingType === 'person-swap');
     }
     
     updateProcessButton();
@@ -475,6 +497,35 @@ async function processPersonSwap() {
     return results;
 }
 
+// Handle person swap process specifically
+async function handlePersonSwapProcess() {
+    if (personFiles.length === 0 || backgroundFiles.length === 0) {
+        showAlert('Загрузите фотографии людей и фоны', 'warning');
+        return;
+    }
+
+    const personSwapProcessBtn = document.getElementById('personSwapProcessBtn');
+    if (personSwapProcessBtn) {
+        personSwapProcessBtn.disabled = true;
+    }
+
+    showProgressCard();
+
+    try {
+        const result = await processPersonSwap();
+        console.log('Person swap results:', result);
+        showResults(result);
+    } catch (error) {
+        console.error('Person swap error:', error);
+        showAlert('Ошибка при подстановке людей: ' + error.message, 'danger');
+    } finally {
+        hideProgressCard();
+        if (personSwapProcessBtn) {
+            personSwapProcessBtn.disabled = false;
+        }
+    }
+}
+
 // Person swap file handling functions
 function handlePersonFileSelect(event) {
     const files = Array.from(event.target.files);
@@ -582,18 +633,18 @@ function removeBackgroundFile(index) {
 
 function updatePersonSwapButton() {
     const processingType = document.querySelector('input[name="processingType"]:checked')?.value;
-    if (processingType === 'person-swap') {
+    const personSwapProcessBtn = document.getElementById('personSwapProcessBtn');
+    
+    if (processingType === 'person-swap' && personSwapProcessBtn) {
         const hasPersons = personFiles.length > 0;
         const hasBackgrounds = backgroundFiles.length > 0;
         
-        if (processBtn) {
-            if (hasPersons && hasBackgrounds) {
-                processBtn.classList.remove('d-none');
-                processBtn.disabled = false;
-            } else {
-                processBtn.classList.add('d-none');
-                processBtn.disabled = true;
-            }
+        if (hasPersons && hasBackgrounds) {
+            personSwapProcessBtn.classList.remove('d-none');
+            personSwapProcessBtn.disabled = false;
+        } else {
+            personSwapProcessBtn.classList.add('d-none');
+            personSwapProcessBtn.disabled = true;
         }
     }
 }
