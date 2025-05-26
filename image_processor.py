@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 import cv2
 import numpy as np
 import logging
+import io
 
 # Lazy import для rembg чтобы не блокировать запуск
 rembg_remove = None
@@ -18,6 +19,25 @@ def get_rembg():
             logger.error(f"rembg not available: {e}")
             raise ImportError("rembg library is not properly installed")
     return rembg_remove
+
+def optimize_image_quality(image, max_size=(1920, 1080), quality=85):
+    """Оптимизирует качество изображения без потери качества"""
+    # Изменяем размер если изображение слишком большое
+    if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
+        image.thumbnail(max_size, Image.Resampling.LANCZOS)
+    
+    # Конвертируем в RGB если нужно
+    if image.mode in ('RGBA', 'LA'):
+        background = Image.new('RGB', image.size, (255, 255, 255))
+        if image.mode == 'RGBA':
+            background.paste(image, mask=image.split()[-1])
+        else:
+            background.paste(image, mask=image.split()[-1])
+        image = background
+    elif image.mode != 'RGB':
+        image = image.convert('RGB')
+    
+    return image
 
 logger = logging.getLogger(__name__)
 
@@ -57,17 +77,114 @@ class ImageProcessor:
                 return await self._create_5x15_collage(image_paths, file_id)
             elif collage_type == "5x5":
                 return await self._create_5x5_collage(image_paths, file_id)
+            elif collage_type == "magazine":
+                return await self._create_magazine_cover(image_paths, caption, file_id)
+            elif collage_type == "passport":
+                return await self._create_passport_style(image_paths[0], file_id)
+            elif collage_type == "filmstrip":
+                return await self._create_filmstrip(image_paths, file_id)
+            elif collage_type == "grid":
+                return await self._create_grid_collage(image_paths, file_id)
+            elif collage_type == "vintage":
+                return await self._create_vintage_postcard(image_paths[0], caption, file_id)
+            elif collage_type == "universal":
+                # Универсальная функция - автоматически определяем лучший формат
+                return await self._create_universal_collage(image_paths, caption, file_id)
             else:
                 raise ValueError(f"Unknown collage type: {collage_type}")
                 
         except Exception as e:
             logger.error(f"Error creating collage: {e}")
             raise
+
+    async def _create_universal_collage(self, image_paths: list, caption: str, file_id: str, 
+                                      background_color=(255, 255, 255), logo_text="PhotoProcessor",
+                                      columns=None) -> str:
+        """Универсальная функция для создания коллажей с автоматическим размещением"""
+        num_images = len(image_paths)
+        
+        # Автоматически определяем количество колонок если не задано
+        if columns is None:
+            if num_images == 1:
+                columns = 1
+            elif num_images <= 4:
+                columns = 2
+            elif num_images <= 9:
+                columns = 3
+            else:
+                columns = 4
+        
+        rows = (num_images + columns - 1) // columns
+        
+        # Размеры изображения
+        img_width = 400
+        img_height = 300
+        margin = 30
+        header_height = 80 if caption else 40
+        footer_height = 60
+        
+        canvas_width = columns * img_width + (columns + 1) * margin
+        canvas_height = rows * img_height + (rows + 1) * margin + header_height + footer_height
+        
+        # Создаем холст
+        canvas = Image.new("RGB", (canvas_width, canvas_height), background_color)
+        draw = ImageDraw.Draw(canvas)
+        
+        # Добавляем заголовок
+        if caption:
+            try:
+                title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
+            except:
+                title_font = ImageFont.load_default()
+            
+            bbox = draw.textbbox((0, 0), caption, font=title_font)
+            text_width = bbox[2] - bbox[0]
+            text_x = (canvas_width - text_width) // 2
+            draw.text((text_x, 20), caption, fill="black", font=title_font)
+        
+        # Размещаем изображения
+        for i, img_path in enumerate(image_paths):
+            if i >= columns * rows:
+                break
+                
+            img = Image.open(img_path)
+            img = optimize_image_quality(img, (img_width, img_height))
+            
+            # Сохраняем пропорции
+            img.thumbnail((img_width, img_height), Image.Resampling.LANCZOS)
+            
+            # Вычисляем позицию
+            col = i % columns
+            row = i // columns
+            
+            x = margin + col * (img_width + margin) + (img_width - img.width) // 2
+            y = header_height + margin + row * (img_height + margin) + (img_height - img.height) // 2
+            
+            canvas.paste(img, (x, y))
+        
+        # Добавляем логотип
+        try:
+            logo_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+        except:
+            logo_font = ImageFont.load_default()
+        
+        bbox = draw.textbbox((0, 0), logo_text, font=logo_font)
+        logo_width = bbox[2] - bbox[0]
+        logo_x = canvas_width - logo_width - 20
+        logo_y = canvas_height - 40
+        draw.text((logo_x, logo_y), logo_text, fill="gray", font=logo_font)
+        
+        # Сохраняем
+        output_path = f"processed/{file_id}_universal_collage.png"
+        canvas.save(output_path, optimize=True, quality=90)
+        logger.info(f"Universal collage created: {output_path}")
+        return output_path
     
     async def _create_polaroid(self, image_path: str, caption: str, file_id: str) -> str:
         """Create polaroid-style photo"""
         # Open and resize image
         img = Image.open(image_path)
+        img = optimize_image_quality(img)
         img = img.convert("RGB")
         
         # Resize to fit in polaroid (square crop)
@@ -305,3 +422,230 @@ class ImageProcessor:
         except Exception as e:
             logger.error(f"Error retouching image: {e}")
             raise
+
+    async def _create_magazine_cover(self, image_paths: list, caption: str, file_id: str) -> str:
+        """Создает обложку журнала с главным фото и миниатюрами"""
+        canvas_width = 800
+        canvas_height = 1000
+        canvas = Image.new("RGB", (canvas_width, canvas_height), (20, 20, 40))
+        
+        # Главное изображение
+        main_img = Image.open(image_paths[0])
+        main_img = optimize_image_quality(main_img, (600, 400))
+        main_img.thumbnail((600, 400), Image.Resampling.LANCZOS)
+        
+        main_x = (canvas_width - main_img.width) // 2
+        main_y = 150
+        canvas.paste(main_img, (main_x, main_y))
+        
+        # Добавляем название журнала
+        draw = ImageDraw.Draw(canvas)
+        try:
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
+            subtitle_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+        except:
+            title_font = ImageFont.load_default()
+            subtitle_font = ImageFont.load_default()
+        
+        # Название журнала
+        magazine_title = "PHOTO MAGAZINE"
+        bbox = draw.textbbox((0, 0), magazine_title, font=title_font)
+        title_width = bbox[2] - bbox[0]
+        draw.text(((canvas_width - title_width) // 2, 50), magazine_title, fill="white", font=title_font)
+        
+        if caption:
+            bbox = draw.textbbox((0, 0), caption, font=subtitle_font)
+            caption_width = bbox[2] - bbox[0]
+            draw.text(((canvas_width - caption_width) // 2, 600), caption, fill="white", font=subtitle_font)
+        
+        # Миниатюры внизу
+        if len(image_paths) > 1:
+            mini_y = 700
+            mini_size = 120
+            for i, img_path in enumerate(image_paths[1:4]):  # Максимум 3 миниатюры
+                mini_img = Image.open(img_path)
+                mini_img = optimize_image_quality(mini_img, (mini_size, mini_size))
+                mini_img.thumbnail((mini_size, mini_size), Image.Resampling.LANCZOS)
+                
+                mini_x = 100 + i * (mini_size + 40)
+                canvas.paste(mini_img, (mini_x, mini_y))
+        
+        output_path = f"processed/{file_id}_magazine.png"
+        canvas.save(output_path, optimize=True, quality=90)
+        return output_path
+
+    async def _create_passport_style(self, image_path: str, file_id: str) -> str:
+        """Создает фото в стиле паспорта (4 одинаковых фото)"""
+        canvas_width = 600
+        canvas_height = 800
+        canvas = Image.new("RGB", (canvas_width, canvas_height), "white")
+        
+        # Открываем и обрабатываем фото
+        img = Image.open(image_path)
+        img = optimize_image_quality(img, (250, 350))
+        
+        # Делаем квадратную обрезку для паспортного фото
+        size = min(img.size)
+        img = img.crop(((img.width - size) // 2, (img.height - size) // 2, 
+                       (img.width + size) // 2, (img.height + size) // 2))
+        img = img.resize((250, 350), Image.Resampling.LANCZOS)
+        
+        # Размещаем 4 фото
+        positions = [(50, 50), (300, 50), (50, 400), (300, 400)]
+        for pos in positions:
+            canvas.paste(img, pos)
+        
+        # Добавляем разделительные линии
+        draw = ImageDraw.Draw(canvas)
+        draw.line([(0, canvas_height//2), (canvas_width, canvas_height//2)], fill="lightgray", width=2)
+        draw.line([(canvas_width//2, 0), (canvas_width//2, canvas_height)], fill="lightgray", width=2)
+        
+        output_path = f"processed/{file_id}_passport.png"
+        canvas.save(output_path, optimize=True, quality=90)
+        return output_path
+
+    async def _create_filmstrip(self, image_paths: list, file_id: str) -> str:
+        """Создает коллаж в стиле кинопленки"""
+        strip_width = 1200
+        strip_height = 300
+        border = 20
+        
+        canvas_height = strip_height + 2 * border
+        canvas = Image.new("RGB", (strip_width, canvas_height), "black")
+        
+        # Количество кадров
+        num_frames = min(len(image_paths), 6)
+        frame_width = (strip_width - 2 * border) // num_frames
+        frame_height = strip_height
+        
+        for i in range(num_frames):
+            img = Image.open(image_paths[i])
+            img = optimize_image_quality(img, (frame_width - 10, frame_height - 10))
+            img.thumbnail((frame_width - 10, frame_height - 10), Image.Resampling.LANCZOS)
+            
+            x = border + i * frame_width + (frame_width - img.width) // 2
+            y = border + (frame_height - img.height) // 2
+            canvas.paste(img, (x, y))
+        
+        # Добавляем перфорацию кинопленки
+        draw = ImageDraw.Draw(canvas)
+        for i in range(0, strip_width, 30):
+            draw.rectangle([i, 5, i + 10, 15], fill="white")
+            draw.rectangle([i, canvas_height - 15, i + 10, canvas_height - 5], fill="white")
+        
+        output_path = f"processed/{file_id}_filmstrip.png"
+        canvas.save(output_path, optimize=True, quality=90)
+        return output_path
+
+    async def _create_grid_collage(self, image_paths: list, file_id: str) -> str:
+        """Создает сетку из фотографий"""
+        num_images = len(image_paths)
+        grid_size = int(num_images ** 0.5) + (1 if num_images ** 0.5 != int(num_images ** 0.5) else 0)
+        
+        img_size = 300
+        margin = 10
+        canvas_size = grid_size * img_size + (grid_size + 1) * margin
+        
+        canvas = Image.new("RGB", (canvas_size, canvas_size), "white")
+        
+        for i, img_path in enumerate(image_paths[:grid_size * grid_size]):
+            img = Image.open(img_path)
+            img = optimize_image_quality(img, (img_size, img_size))
+            
+            # Делаем квадратным
+            size = min(img.size)
+            img = img.crop(((img.width - size) // 2, (img.height - size) // 2, 
+                           (img.width + size) // 2, (img.height + size) // 2))
+            img = img.resize((img_size, img_size), Image.Resampling.LANCZOS)
+            
+            row = i // grid_size
+            col = i % grid_size
+            x = margin + col * (img_size + margin)
+            y = margin + row * (img_size + margin)
+            
+            canvas.paste(img, (x, y))
+        
+        output_path = f"processed/{file_id}_grid.png"
+        canvas.save(output_path, optimize=True, quality=90)
+        return output_path
+
+    async def _create_vintage_postcard(self, image_path: str, caption: str, file_id: str) -> str:
+        """Создает винтажную открытку"""
+        canvas_width = 800
+        canvas_height = 500
+        canvas = Image.new("RGB", (canvas_width, canvas_height), (245, 235, 215))  # Бежевый фон
+        
+        # Основное изображение
+        img = Image.open(image_path)
+        img = optimize_image_quality(img, (450, 350))
+        img.thumbnail((450, 350), Image.Resampling.LANCZOS)
+        
+        # Добавляем винтажный эффект
+        img = img.convert("RGB")
+        enhancer = ImageEnhance.Color(img)
+        img = enhancer.enhance(0.8)  # Приглушенные цвета
+        
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(0.9)  # Мягкий контраст
+        
+        # Размещаем изображение
+        img_x = 50
+        img_y = (canvas_height - img.height) // 2
+        canvas.paste(img, (img_x, img_y))
+        
+        # Добавляем рамку вокруг фото
+        draw = ImageDraw.Draw(canvas)
+        border_color = (139, 69, 19)  # Коричневый
+        draw.rectangle([img_x - 5, img_y - 5, img_x + img.width + 5, img_y + img.height + 5], 
+                      outline=border_color, width=3)
+        
+        # Область для текста
+        text_area_x = img_x + img.width + 50
+        text_area_width = canvas_width - text_area_x - 30
+        
+        # Добавляем заголовок открытки
+        try:
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+            text_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
+        except:
+            title_font = ImageFont.load_default()
+            text_font = ImageFont.load_default()
+        
+        postcard_title = "Vintage Memories"
+        draw.text((text_area_x, 80), postcard_title, fill=border_color, font=title_font)
+        
+        if caption:
+            # Разбиваем длинный текст на строки
+            words = caption.split()
+            lines = []
+            current_line = ""
+            
+            for word in words:
+                test_line = current_line + " " + word if current_line else word
+                bbox = draw.textbbox((0, 0), test_line, font=text_font)
+                if bbox[2] - bbox[0] <= text_area_width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
+            
+            if current_line:
+                lines.append(current_line)
+            
+            # Выводим текст
+            line_height = 30
+            for i, line in enumerate(lines[:8]):  # Максимум 8 строк
+                draw.text((text_area_x, 150 + i * line_height), line, fill="black", font=text_font)
+        
+        # Добавляем декоративную марку
+        stamp_size = 80
+        stamp_x = canvas_width - stamp_size - 20
+        stamp_y = 20
+        draw.rectangle([stamp_x, stamp_y, stamp_x + stamp_size, stamp_y + stamp_size], 
+                      outline=border_color, width=2)
+        draw.text((stamp_x + 10, stamp_y + 30), "PHOTO", fill=border_color, font=text_font)
+        
+        output_path = f"processed/{file_id}_vintage.png"
+        canvas.save(output_path, optimize=True, quality=90)
+        return output_path

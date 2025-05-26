@@ -164,7 +164,17 @@ function updateProcessButton() {
 function getRequiredFilesCount(processingType) {
     if (processingType === 'create-collage') {
         const collageType = document.getElementById('collageType')?.value;
-        const requirements = { 'polaroid': 1, '5x15': 3, '5x5': 2 };
+        const requirements = { 
+            'polaroid': 1, 
+            '5x15': 3, 
+            '5x5': 2,
+            'magazine': 1,
+            'passport': 1,
+            'filmstrip': 1,
+            'grid': 1,
+            'vintage': 1,
+            'universal': 1
+        };
         return requirements[collageType] || 1;
     }
     return 1;

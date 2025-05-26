@@ -17,8 +17,7 @@ import threading
 
 from image_processor import ImageProcessor
 from models import User, ProcessedImage, get_db, init_db
-
-# Временно отключаем telegram бот до настройки токена
+# Telegram bot временно отключен для отладки
 # from telegram_bot import TelegramBot
 
 # Configure logging
