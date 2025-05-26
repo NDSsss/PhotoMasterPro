@@ -276,14 +276,20 @@ async function processRemoveBackground() {
             body: formData
         });
         
+        console.log(`Response ${i + 1} status:`, response.status);
+        
         if (response.ok) {
             const result = await response.json();
+            console.log(`Received result ${i + 1}:`, result);
             results.push(result);
+        } else {
+            console.error(`Error processing file ${i + 1}:`, response.status, await response.text());
         }
     }
     
     updateProgress(100, 'Завершено!');
     
+    console.log('All results collected:', results);
     return results.length === 1 ? results[0] : results;
 }
 
