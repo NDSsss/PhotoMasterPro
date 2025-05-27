@@ -1078,8 +1078,12 @@ async function processSocialMediaOptimization() {
     
     updateProgress(30, 'Создание версий для разных платформ...');
     
-    const response = await fetchWithAuth('/api/social-media-optimize', {
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    const response = await fetch('/api/social-media-optimize', {
         method: 'POST',
+        headers: headers,
         body: formData
     });
     
@@ -1088,7 +1092,9 @@ async function processSocialMediaOptimization() {
     }
     
     updateProgress(100, 'Оптимизация завершена!');
-    return await response.json();
+    const result = await response.json();
+    console.log('Social media optimization result:', result);
+    return result;
 }
 
 // Export functions for global access
