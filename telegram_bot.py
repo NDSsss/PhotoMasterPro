@@ -58,18 +58,19 @@ class TelegramBot:
 Привет, {user.first_name}! Я помогу вам обработать ваши фотографии.
 
 Доступные функции:
-• 🖼️ Удаление фона
-• 📷 Создание коллажей (полароид, 5x15, 5x5)
-• 🖼️ Добавление рамок
+• 🔄 Удаление фона (rembg или LBM)
+• 🖼️ Добавление рамок (встроенные или свои)
+• 🎭 Создание коллажей (полароид, 5x15, 5x5)
+• 👤 Подстановка людей на фоны
 • ✨ Автоматическая ретушь
 
-Выберите действие из меню ниже или отправьте фото для быстрой обработки.
+Выберите действие из меню ниже:
         """
         
         keyboard = [
-            [KeyboardButton("🖼️ Удалить фон"), KeyboardButton("📷 Создать коллаж")],
-            [KeyboardButton("🖼️ Добавить рамку"), KeyboardButton("✨ Ретушь фото")],
-            [KeyboardButton("ℹ️ Помощь")]
+            [KeyboardButton("🔄 Удалить фон"), KeyboardButton("🖼️ Добавить рамку")],
+            [KeyboardButton("🎭 Создать коллаж"), KeyboardButton("👤 Подставить человека")],
+            [KeyboardButton("✨ Ретушь фото"), KeyboardButton("ℹ️ Помощь")]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         
@@ -104,12 +105,14 @@ class TelegramBot:
         text = update.message.text
         user_id = update.effective_user.id
         
-        if text == "🖼️ Удалить фон":
-            await self.request_photo_for_background_removal(update, context)
-        elif text == "📷 Создать коллаж":
-            await self.show_collage_options(update, context)
+        if text == "🔄 Удалить фон":
+            await self.request_background_removal_method(update, context)
         elif text == "🖼️ Добавить рамку":
             await self.request_photo_for_frame(update, context)
+        elif text == "🎭 Создать коллаж":
+            await self.show_collage_options(update, context)
+        elif text == "👤 Подставить человека":
+            await self.request_person_photo(update, context)
         elif text == "✨ Ретушь фото":
             await self.request_photo_for_retouch(update, context)
         elif text == "ℹ️ Помощь":
@@ -512,3 +515,99 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Error in quick retouch: {e}")
             await query.edit_message_text("❌ Произошла ошибка при ретуши фото.")
+
+    async def request_background_removal_method(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Request method for background removal"""
+        keyboard = [
+            [InlineKeyboardButton("🔧 REMBG (Быстрый)", callback_data="bg_method_rembg")],
+            [InlineKeyboardButton("🎯 LBM (Качественный)", callback_data="bg_method_lbm")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "🔄 **Удаление фона**\n\n"
+            "Выберите метод удаления фона:\n\n"
+            "🔧 **REMBG** - Быстрый и эффективный\n"
+            "🎯 **LBM** - Более качественный результат\n\n"
+            "Какой метод предпочитаете?",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+
+    async def request_person_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Request person photo for background swapping"""
+        user_id = update.effective_user.id
+        self.user_states[user_id] = {
+            "state": "waiting_person_photo",
+            "person_photos": []
+        }
+        
+        await update.message.reply_text(
+            "👤 **Подстановка человека на фон**\n\n"
+            "Пожалуйста, отправьте фотографию человека, которого нужно подставить на другие фоны.\n\n"
+            "📸 Лучше всего подходят фото с хорошо видимым человеком на контрастном фоне.",
+            parse_mode='Markdown'
+        )
+
+    async def request_backgrounds_for_person_swap(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Request background photos for person swapping"""
+        user_id = update.effective_user.id
+        
+        if user_id not in self.user_states:
+            await update.message.reply_text("Ошибка: сначала отправьте фото человека.")
+            return
+            
+        self.user_states[user_id]["state"] = "waiting_background_photos"
+        self.user_states[user_id]["background_photos"] = []
+        
+        await update.message.reply_text(
+            "🌄 Отлично! Теперь отправьте фотографии фонов, на которые нужно подставить человека.\n\n"
+            "📸 Можете отправить несколько фото подряд\n"
+            "✅ Когда закончите, отправьте команду /done"
+        )
+
+    async def process_person_swap_final(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Process final person swap"""
+        user_id = update.effective_user.id
+        
+        if user_id not in self.user_states:
+            await update.message.reply_text("Ошибка: данные не найдены.")
+            return
+        
+        state = self.user_states[user_id]
+        person_photos = state.get("person_photos", [])
+        background_photos = state.get("background_photos", [])
+        
+        if not person_photos or not background_photos:
+            await update.message.reply_text("Ошибка: не хватает фотографий.")
+            return
+        
+        await update.message.reply_text("🔄 Начинаю подстановку человека на фоны...")
+        
+        try:
+            processor = ImageProcessor()
+            file_id = str(uuid.uuid4())
+            
+            results = await processor.person_swap_separate(person_photos, background_photos, file_id)
+            
+            if results:
+                await update.message.reply_text(f"✅ Создано {len(results)} вариантов!")
+                
+                for i, result_path in enumerate(results):
+                    try:
+                        with open(result_path, 'rb') as photo:
+                            await update.message.reply_photo(
+                                photo=photo,
+                                caption=f"👤 Вариант {i+1}"
+                            )
+                    except Exception as e:
+                        logger.error(f"Error sending result {i}: {e}")
+            else:
+                await update.message.reply_text("❌ Ошибка при подстановке человека")
+                
+        except Exception as e:
+            logger.error(f"Error in person swap: {e}")
+            await update.message.reply_text("❌ Произошла ошибка при обработке")
+        
+        # Clear state
+        del self.user_states[user_id]
