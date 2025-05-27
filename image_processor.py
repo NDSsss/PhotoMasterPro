@@ -643,6 +643,10 @@ class ImageProcessor:
                 crop_width = min(width, int(height * target_ratio))
                 crop_height = int(crop_width / target_ratio)
             
+            # Define safety margins (15% from edges)
+            margin_x = int(crop_width * 0.15)
+            margin_y = int(crop_height * 0.15)
+            
             # Smart positioning logic
             # For portraits (tall images), bias towards upper portion to avoid cutting heads
             if height > width * 1.2:  # Portrait orientation
@@ -668,15 +672,25 @@ class ImageProcessor:
                 focal_x, focal_y = self._find_focal_point(img)
                 
                 if focal_x is not None and focal_y is not None:
-                    # Center crop around focal point
-                    left = max(0, min(focal_x - crop_width // 2, width - crop_width))
-                    top = max(0, min(focal_y - crop_height // 2, height - crop_height))
-                    logger.info(f"Focal point detected at ({focal_x}, {focal_y}), cropping around it")
+                    # Center crop around focal point with safety margins
+                    left = max(margin_x, min(int(focal_x) - crop_width // 2, width - crop_width - margin_x))
+                    top = max(margin_y, min(int(focal_y) - crop_height // 2, height - crop_height - margin_y))
+                    
+                    # Ensure we don't go beyond image boundaries
+                    left = max(0, min(left, width - crop_width))
+                    top = max(0, min(top, height - crop_height))
+                    
+                    logger.info(f"Focal point detected at ({focal_x}, {focal_y}), cropping with margins at ({left}, {top})")
                 else:
-                    # Default center crop with upward bias for potential faces
-                    left = (width - crop_width) // 2
-                    top = max(0, (height - crop_height) // 2 - int(height * 0.1))
-                    logger.info("Using center crop with upward bias")
+                    # Default center crop with upward bias for potential faces and margins
+                    left = max(margin_x, (width - crop_width) // 2)
+                    top = max(margin_y, (height - crop_height) // 2 - int(height * 0.1))
+                    
+                    # Ensure we don't go beyond image boundaries
+                    left = max(0, min(left, width - crop_width))
+                    top = max(0, min(top, height - crop_height))
+                    
+                    logger.info(f"Using center crop with upward bias and margins at ({left}, {top})")
             
             right = left + crop_width
             bottom = top + crop_height
