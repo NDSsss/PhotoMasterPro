@@ -643,9 +643,11 @@ class ImageProcessor:
                 crop_width = min(width, int(height * target_ratio))
                 crop_height = int(crop_width / target_ratio)
             
-            # Define safety margins (15% from edges)
-            margin_x = int(crop_width * 0.15)
-            margin_y = int(crop_height * 0.15)
+            # Define safety margins (25% from edges for better face protection)
+            margin_x = int(crop_width * 0.25)
+            margin_y = int(crop_height * 0.25)
+            
+            logger.info(f"Image size: {width}x{height}, Crop size: {crop_width}x{crop_height}, Margins: {margin_x}x{margin_y}")
             
             # Always try to find focal point first for all image types
             focal_x, focal_y = self._find_focal_point(img)
@@ -653,18 +655,26 @@ class ImageProcessor:
             # Smart positioning logic with margins applied to ALL cases
             if focal_x is not None and focal_y is not None:
                 # Center crop around focal point with safety margins
-                left = int(focal_x) - crop_width // 2
-                top = int(focal_y) - crop_height // 2
+                desired_left = int(focal_x) - crop_width // 2
+                desired_top = int(focal_y) - crop_height // 2
                 
-                # Apply safety margins - ensure focal point isn't too close to edges
-                left = max(margin_x, min(left, width - crop_width - margin_x))
-                top = max(margin_y, min(top, height - crop_height - margin_y))
+                # Apply safety margins - ensure we don't get too close to edges
+                # Left bound: must be at least margin_x from left edge
+                # Right bound: must be at least margin_x from right edge (width - crop_width - margin_x)
+                left = max(margin_x, min(desired_left, width - crop_width - margin_x))
+                top = max(margin_y, min(desired_top, height - crop_height - margin_y))
                 
-                # Final boundary check
-                left = max(0, min(left, width - crop_width))
-                top = max(0, min(top, height - crop_height))
+                # Additional safety - if margins push us beyond image bounds, center with available space
+                if left < 0:
+                    left = max(0, (width - crop_width) // 2)
+                if top < 0:
+                    top = max(0, (height - crop_height) // 2)
+                if left + crop_width > width:
+                    left = width - crop_width
+                if top + crop_height > height:
+                    top = height - crop_height
                 
-                logger.info(f"Focal point detected at ({focal_x}, {focal_y}), cropping with 15% margins at ({left}, {top})")
+                logger.info(f"Focal point at ({focal_x}, {focal_y}), desired pos ({desired_left}, {desired_top}), final with margins at ({left}, {top}), margins=({margin_x}, {margin_y})")
             
             # Fallback positioning with margins based on image orientation
             else:
