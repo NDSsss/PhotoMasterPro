@@ -549,13 +549,30 @@ async def telegram_webhook(request: Request):
     try:
         import json
         
+        # Get headers for debugging
+        headers = dict(request.headers)
+        logger.info(f"=== WEBHOOK REQUEST ===")
+        logger.info(f"Headers: {headers}")
+        logger.info(f"Method: {request.method}")
+        logger.info(f"URL: {request.url}")
+        
         # Get the raw update data
         update_data = await request.json()
-        logger.info(f"Received webhook update: {update_data}")
+        logger.info(f"=== TELEGRAM UPDATE DATA ===")
+        logger.info(f"Raw update: {json.dumps(update_data, indent=2, ensure_ascii=False)}")
+        
+        # Check what type of update this is
+        if "message" in update_data:
+            message = update_data["message"]
+            logger.info(f"Message from user {message.get('from', {}).get('username', 'unknown')}")
+            logger.info(f"Text: {message.get('text', 'No text')}")
+            logger.info(f"Chat ID: {message.get('chat', {}).get('id', 'unknown')}")
         
         # Simple response for webhook testing
         return {"status": "ok", "received": True}
         
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
