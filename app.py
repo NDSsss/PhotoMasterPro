@@ -541,3 +541,44 @@ os.makedirs("static/css", exist_ok=True)
 os.makedirs("static/js", exist_ok=True)
 os.makedirs("static/images", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
+
+# Telegram webhook endpoint
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    """Handle Telegram webhook updates"""
+    try:
+        from telegram import Update
+        from telegram_bot import TelegramBot
+        import asyncio
+        
+        # Get the raw update data
+        update_data = await request.json()
+        logger.info(f"Received webhook update: {update_data}")
+        
+        # Create Update object
+        update = Update.de_json(update_data, None)
+        
+        # Process the update with bot (create new instance for webhook)
+        bot = TelegramBot()
+        
+        # Handle the update based on type
+        if update.message:
+            if update.message.photo:
+                await bot.handle_photo(update, None)
+            elif update.message.text:
+                if update.message.text.startswith('/'):
+                    if update.message.text == '/start':
+                        await bot.start_command(update, None)
+                    elif update.message.text == '/help':
+                        await bot.help_command(update, None)
+                    elif update.message.text == '/done':
+                        await bot.handle_done_command(update, None)
+                else:
+                    await bot.handle_text(update, None)
+        elif update.callback_query:
+            await bot.button_callback(update, None)
+        
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Error processing webhook: {e}")
+        return {"status": "error", "message": str(e)}
