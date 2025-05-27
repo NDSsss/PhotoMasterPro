@@ -503,9 +503,27 @@ class ImageProcessor:
         return output_path
     
     async def add_frame(self, image_path: str, frame_style: str, file_id: str) -> str:
-        """Add decorative frame to image"""
+        """Add decorative frame to image with smart cropping"""
         try:
             img = Image.open(image_path)
+            img = img.convert("RGB")
+            width, height = img.size
+            
+            # Determine optimal aspect ratio for framing based on image orientation
+            if width > height * 1.2:  # Landscape
+                target_ratio = "4:3"  # Good for landscape photos
+            elif height > width * 1.2:  # Portrait  
+                target_ratio = "3:4"  # Good for portrait photos
+            else:  # Square-ish
+                target_ratio = "1:1"  # Square frame
+            
+            logger.info(f"🖼️ РАМКА: Применяется умная обрезка {target_ratio} для оптимального кадрирования")
+            
+            # Apply smart crop before framing
+            cropped_path = await self.smart_crop(image_path, target_ratio, f"{file_id}_for_frame")
+            
+            # Load the cropped image for framing
+            img = Image.open(cropped_path)
             img = img.convert("RGB")
             
             # Frame styles
