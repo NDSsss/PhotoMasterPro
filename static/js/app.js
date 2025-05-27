@@ -1025,6 +1025,27 @@ function showRegisterModal() {
     }
 }
 
+async function processSocialMediaOptimization() {
+    updateProgress(10, 'Запуск оптимизации для социальных сетей...');
+    
+    const formData = new FormData();
+    formData.append('file', selectedFiles[0]);
+    
+    updateProgress(30, 'Создание версий для разных платформ...');
+    
+    const response = await fetchWithAuth('/api/social-media-optimize', {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (!response.ok) {
+        throw new Error('Ошибка при оптимизации для социальных сетей');
+    }
+    
+    updateProgress(100, 'Оптимизация завершена!');
+    return await response.json();
+}
+
 // Export functions for global access
 window.removeFile = removeFile;
 window.resetForm = resetForm;
