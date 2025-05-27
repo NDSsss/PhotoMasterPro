@@ -649,6 +649,10 @@ https://photo-master-pro-dddddd1997.replit.app"""
                 
                 if action == "remove_bg":
                     await process_remove_background(bot_token, chat_id, message, username)
+                elif action == "add_frame_photo":
+                    await process_add_frame_photo(bot_token, chat_id, message, username, user_state)
+                elif action == "smart_crop_photo":
+                    await process_smart_crop_photo(bot_token, chat_id, message, username, user_state)
                 elif action == "add_frame":
                     await process_add_frame(bot_token, chat_id, message, username)
                 elif action == "smart_crop":
@@ -672,6 +676,17 @@ https://photo-master-pro-dddddd1997.replit.app"""
                             [{"text": "🎨 Показать меню действий", "callback_data": "show_menu"}]
                         ]
                     }
+                    
+                    # Send message with keyboard
+                    telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                    payload = {
+                        "chat_id": chat_id,
+                        "text": response_text,
+                        "parse_mode": "Markdown",
+                        "reply_markup": keyboard
+                    }
+                    response = requests.post(telegram_url, json=payload)
+                    return {"status": "ok"}
                 
             else:
                 response_text = """❓ Не понимаю эту команду.
@@ -749,34 +764,21 @@ https://photo-master-pro-dddddd1997.replit.app"""
                 
             elif callback_data == "add_frame":
                 user_id = user.get("id")
-                user_states[user_id] = {"action": "add_frame"}
+                user_states[user_id] = {"action": "add_frame_photo"}
                 
                 response_text = """🖼️ *Добавление рамки*
 
-Отправьте фото, к которому хотите добавить декоративную рамку.
-
-🎨 *Доступные стили:*
-• Классическая рамка
-• Современная рамка
-• Винтажная рамка
+Сначала отправьте фото, к которому хотите добавить рамку.
 
 📤 *Отправьте фото!*"""
                 
             elif callback_data == "smart_crop":
                 user_id = user.get("id")
-                user_states[user_id] = {"action": "smart_crop"}
+                user_states[user_id] = {"action": "smart_crop_photo"}
                 
                 response_text = """✂️ *Умная обрезка*
 
-Отправьте фото для обрезки под нужный формат.
-
-📐 *Доступные форматы:*
-• Квадрат (1:1)
-• Прямоугольник (16:9)
-• Портрет (3:4)
-• И другие форматы
-
-🧠 ИИ автоматически найдет лучшую композицию!
+Сначала отправьте фото для обрезки.
 
 📤 *Отправьте фото!*"""
                 
@@ -850,6 +852,34 @@ https://photo-master-pro-dddddd1997.replit.app"""
                     ]
                 }
             
+            # Handle frame selection callbacks
+            elif callback_data.startswith("frame_"):
+                user_id = user.get("id")
+                user_state = user_states.get(user_id, {})
+                frame_type = callback_data.replace("frame_", "")
+                
+                if frame_type == "custom":
+                    user_state["action"] = "upload_frame"
+                    response_text = "📤 *Отправьте фото рамки*\n\nЗагрузите изображение рамки, которую хотите применить."
+                else:
+                    # Process with selected frame
+                    await process_frame_with_type(bot_token, chat_id, user_state, frame_type, username)
+                    return {"status": "ok"}
+            
+            # Handle aspect ratio selection callbacks
+            elif callback_data.startswith("aspect_"):
+                user_id = user.get("id")
+                user_state = user_states.get(user_id, {})
+                aspect_ratio = callback_data.replace("aspect_", "")
+                
+                if aspect_ratio == "custom":
+                    user_state["action"] = "input_aspect"
+                    response_text = "✏️ *Введите соотношение сторон*\n\nНапример: 16:9, 4:3, 21:9\n\nОтправьте текстом в формате ширина:высота"
+                else:
+                    # Process with selected aspect ratio
+                    await process_crop_with_aspect(bot_token, chat_id, user_state, aspect_ratio, username)
+                    return {"status": "ok"}
+            
             # Send response
             if response_text and chat_id:
                 telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -877,21 +907,101 @@ https://photo-master-pro-dddddd1997.replit.app"""
 async def process_remove_background(bot_token, chat_id, message, username):
     """Process background removal"""
     try:
-        # Send processing message
         await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nУдаляю фон, подождите немного!", "Markdown")
         
-        # Download and process photo
+        # Download photo
         photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
         if photo_url:
-            # Here we would call the actual image processing
-            await send_telegram_message(bot_token, chat_id, 
-                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
-                "Markdown")
+            # Call actual image processing
+            from image_processor import ImageProcessor
+            import uuid
+            import aiofiles
+            import requests
+            
+            # Download and save photo
+            file_id = str(uuid.uuid4())
+            input_path = f"uploads/{file_id}_input.jpg"
+            
+            # Download photo data
+            photo_response = requests.get(photo_url)
+            if photo_response.status_code == 200:
+                async with aiofiles.open(input_path, 'wb') as f:
+                    await f.write(photo_response.content)
+                
+                # Process with ImageProcessor
+                processor = ImageProcessor()
+                result_path = await processor.remove_background(input_path, file_id, "rembg")
+                
+                # Send result back
+                await send_telegram_photo(bot_token, chat_id, result_path, "✅ *Фон удален!*")
+            else:
+                await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
         else:
             await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
             
     except Exception as e:
         logger.error(f"Error in process_remove_background: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_add_frame_photo(bot_token, chat_id, message, username, user_state):
+    """Process frame addition - first get photo, then show frame options"""
+    try:
+        # Save photo and show frame options
+        file_id = message["photo"][-1]["file_id"]
+        user_state["photo_file_id"] = file_id
+        user_state["action"] = "select_frame"
+        
+        # Show frame selection
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🖼️ Классическая", "callback_data": "frame_classic"},
+                    {"text": "🎨 Современная", "callback_data": "frame_modern"}
+                ],
+                [
+                    {"text": "📜 Винтажная", "callback_data": "frame_vintage"},
+                    {"text": "📤 Загрузить свою", "callback_data": "frame_custom"}
+                ]
+            ]
+        }
+        
+        await send_telegram_message_with_keyboard(bot_token, chat_id, 
+            "🖼️ *Фото получено!*\n\nВыберите тип рамки:", "Markdown", keyboard)
+            
+    except Exception as e:
+        logger.error(f"Error in process_add_frame_photo: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_smart_crop_photo(bot_token, chat_id, message, username, user_state):
+    """Process smart crop - first get photo, then show aspect ratio options"""
+    try:
+        # Save photo and show aspect ratio options
+        file_id = message["photo"][-1]["file_id"]
+        user_state["photo_file_id"] = file_id
+        user_state["action"] = "select_aspect"
+        
+        # Show aspect ratio selection
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "📱 1:1 (Квадрат)", "callback_data": "aspect_1x1"},
+                    {"text": "📺 16:9 (Широкий)", "callback_data": "aspect_16x9"}
+                ],
+                [
+                    {"text": "📷 3:4 (Портрет)", "callback_data": "aspect_3x4"},
+                    {"text": "🖥️ 3:2 (Классика)", "callback_data": "aspect_3x2"}
+                ],
+                [
+                    {"text": "✏️ Свое соотношение", "callback_data": "aspect_custom"}
+                ]
+            ]
+        }
+        
+        await send_telegram_message_with_keyboard(bot_token, chat_id, 
+            "✂️ *Фото получено!*\n\nВыберите соотношение сторон:", "Markdown", keyboard)
+            
+    except Exception as e:
+        logger.error(f"Error in process_smart_crop_photo: {e}")
         await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
 
 async def process_add_frame(bot_token, chat_id, message, username):
@@ -1030,3 +1140,137 @@ async def download_telegram_photo(bot_token, file_id):
     except Exception as e:
         logger.error(f"Error downloading photo: {e}")
         return None
+
+async def send_telegram_photo(bot_token, chat_id, photo_path, caption=""):
+    """Send photo to Telegram chat"""
+    import requests
+    
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+        
+        with open(photo_path, 'rb') as photo:
+            files = {'photo': photo}
+            data = {
+                'chat_id': chat_id,
+                'caption': caption,
+                'parse_mode': 'Markdown'
+            }
+            
+            response = requests.post(url, files=files, data=data)
+            if response.status_code == 200:
+                logger.info(f"Photo sent successfully to chat {chat_id}")
+            else:
+                logger.error(f"Failed to send photo: {response.text}")
+                
+    except Exception as e:
+        logger.error(f"Error sending photo: {e}")
+
+async def send_telegram_message_with_keyboard(bot_token, chat_id, text, parse_mode=None, keyboard=None):
+    """Send message with inline keyboard to Telegram"""
+    import requests
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    if keyboard:
+        payload["reply_markup"] = keyboard
+        
+    response = requests.post(url, json=payload)
+    if response.status_code == 200:
+        logger.info(f"Message with keyboard sent to chat {chat_id}")
+    else:
+        logger.error(f"Failed to send message: {response.text}")
+
+async def process_frame_with_type(bot_token, chat_id, user_state, frame_type, username):
+    """Process frame addition with selected type"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Добавляю рамку...*\n\nПодождите немного!", "Markdown")
+        
+        # Get photo from user state
+        photo_file_id = user_state.get("photo_file_id")
+        if not photo_file_id:
+            await send_telegram_message(bot_token, chat_id, "❌ Фото не найдено. Попробуйте еще раз.")
+            return
+            
+        # Download photo
+        photo_url = await download_telegram_photo(bot_token, photo_file_id)
+        if photo_url:
+            from image_processor import ImageProcessor
+            import uuid
+            import aiofiles
+            import requests
+            
+            # Download and save photo
+            file_id = str(uuid.uuid4())
+            input_path = f"uploads/{file_id}_input.jpg"
+            
+            photo_response = requests.get(photo_url)
+            if photo_response.status_code == 200:
+                async with aiofiles.open(input_path, 'wb') as f:
+                    await f.write(photo_response.content)
+                
+                # Process with ImageProcessor
+                processor = ImageProcessor()
+                result_path = await processor.add_frame(input_path, frame_type, file_id)
+                
+                # Send result back
+                await send_telegram_photo(bot_token, chat_id, result_path, f"✅ *Рамка '{frame_type}' добавлена!*")
+            else:
+                await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            
+        # Clear user state
+        user_state.clear()
+        
+    except Exception as e:
+        logger.error(f"Error in process_frame_with_type: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при добавлении рамки.")
+
+async def process_crop_with_aspect(bot_token, chat_id, user_state, aspect_ratio, username):
+    """Process smart crop with selected aspect ratio"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Выполняю умную обрезку...*\n\nПодождите немного!", "Markdown")
+        
+        # Get photo from user state
+        photo_file_id = user_state.get("photo_file_id")
+        if not photo_file_id:
+            await send_telegram_message(bot_token, chat_id, "❌ Фото не найдено. Попробуйте еще раз.")
+            return
+            
+        # Download photo
+        photo_url = await download_telegram_photo(bot_token, photo_file_id)
+        if photo_url:
+            from image_processor import ImageProcessor
+            import uuid
+            import aiofiles
+            import requests
+            
+            # Download and save photo
+            file_id = str(uuid.uuid4())
+            input_path = f"uploads/{file_id}_input.jpg"
+            
+            photo_response = requests.get(photo_url)
+            if photo_response.status_code == 200:
+                async with aiofiles.open(input_path, 'wb') as f:
+                    await f.write(photo_response.content)
+                
+                # Process with ImageProcessor
+                processor = ImageProcessor()
+                result_path = await processor.smart_crop(input_path, aspect_ratio, file_id)
+                
+                # Send result back
+                await send_telegram_photo(bot_token, chat_id, result_path, f"✅ *Обрезка {aspect_ratio} выполнена!*")
+            else:
+                await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            
+        # Clear user state
+        user_state.clear()
+        
+    except Exception as e:
+        logger.error(f"Error in process_crop_with_aspect: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обрезке.")
