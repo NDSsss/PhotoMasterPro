@@ -688,9 +688,11 @@ class ImageProcessor:
             else:
                 logger.info(f"❌ ОТЛАДКА: Фокусная точка не найдена")
             
-            # Draw analysis grid (areas where we search for contrast)
-            for y in range(int(height * 0.2), int(height * 0.6), max(1, height // 20)):
-                for x in range(int(width * 0.2), int(width * 0.8), max(1, width // 20)):
+            # Draw analysis grid (areas where we search for faces)
+            step_x = max(5, width // 50)
+            step_y = max(5, height // 50)
+            for y in range(int(height * 0.15), int(height * 0.55), step_y):  # Upper portion for faces
+                for x in range(int(width * 0.15), int(width * 0.85), step_x):  # Wider horizontal range
                     # Small blue dots for analysis points
                     draw.ellipse([x-2, y-2, x+2, y+2], fill='blue', outline='blue')
             
@@ -778,23 +780,39 @@ class ImageProcessor:
             raise
 
     def _find_focal_point(self, img):
-        """Find the most interesting point in the image using simple analysis"""
+        """Find the most interesting point in the image - prioritize faces"""
         try:
             # Convert to grayscale for analysis
             gray = img.convert('L')
             width, height = gray.size
             
-            # Sample key points and find highest contrast area
+            # Sample key points and find face-like features
             best_score = 0
             best_x, best_y = None, None
             
-            # Check upper third of image (where faces usually are)
-            for y in range(int(height * 0.2), int(height * 0.6), max(1, height // 20)):
-                for x in range(int(width * 0.2), int(width * 0.8), max(1, width // 20)):
-                    # Calculate local contrast
-                    score = self._calculate_local_contrast(gray, x, y)
-                    if score > best_score:
-                        best_score = score
+            # Focus on upper third where faces are most likely (upper 20%-60% of image)
+            # Use smaller step for better precision
+            step_x = max(5, width // 50)  # More precise scanning
+            step_y = max(5, height // 50)
+            
+            for y in range(int(height * 0.15), int(height * 0.55), step_y):  # Upper portion for faces
+                for x in range(int(width * 0.15), int(width * 0.85), step_x):  # Wider horizontal range
+                    
+                    # Calculate face-like score combining multiple factors
+                    contrast_score = self._calculate_local_contrast(gray, x, y)
+                    
+                    # Bias towards center-upper area (where faces usually are)
+                    center_x = width // 2
+                    center_y = height // 3  # Upper third
+                    distance_from_ideal = ((x - center_x) ** 2 + (y - center_y) ** 2) ** 0.5
+                    max_distance = ((width * 0.5) ** 2 + (height * 0.3) ** 2) ** 0.5
+                    position_score = 1.0 - (distance_from_ideal / max_distance)
+                    
+                    # Combine scores - prioritize good position with decent contrast
+                    total_score = contrast_score * 0.7 + position_score * 100 * 0.3
+                    
+                    if total_score > best_score:
+                        best_score = total_score
                         best_x, best_y = x, y
             
             return best_x, best_y if best_score > 0 else (None, None)
