@@ -114,17 +114,28 @@ function handleFileSelect(event) {
 
 function handleDragOver(event) {
     event.preventDefault();
-    uploadArea.classList.add('dragover');
+    event.stopPropagation();
+    if (uploadArea) {
+        uploadArea.classList.add('drag-over');
+    }
 }
 
 function handleDragLeave(event) {
     event.preventDefault();
-    uploadArea.classList.remove('dragover');
+    event.stopPropagation();
+    // Проверяем, действительно ли мы покинули область
+    if (uploadArea && !uploadArea.contains(event.relatedTarget)) {
+        uploadArea.classList.remove('drag-over');
+    }
 }
 
 function handleDrop(event) {
     event.preventDefault();
-    uploadArea.classList.remove('dragover');
+    event.stopPropagation();
+    
+    if (uploadArea) {
+        uploadArea.classList.remove('drag-over');
+    }
     
     const files = Array.from(event.dataTransfer.files);
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
@@ -133,7 +144,9 @@ function handleDrop(event) {
         showAlert('Пожалуйста, выберите только изображения', 'warning');
     }
     
-    addFiles(imageFiles);
+    if (imageFiles.length > 0) {
+        addFiles(imageFiles);
+    }
 }
 
 function addFiles(files) {
@@ -663,26 +676,46 @@ function handleBackgroundFileSelect(event) {
 
 function handlePersonDragOver(event) {
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.classList.add('drag-over');
 }
 
 function handlePersonDrop(event) {
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.classList.remove('drag-over');
     const files = Array.from(event.dataTransfer.files);
-    addPersonFiles(files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length !== files.length) {
+        showAlert('Пожалуйста, выберите только изображения', 'warning');
+    }
+    
+    if (imageFiles.length > 0) {
+        addPersonFiles(imageFiles);
+    }
 }
 
 function handleBackgroundDragOver(event) {
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.classList.add('drag-over');
 }
 
 function handleBackgroundDrop(event) {
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.classList.remove('drag-over');
     const files = Array.from(event.dataTransfer.files);
-    addBackgroundFiles(files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length !== files.length) {
+        showAlert('Пожалуйста, выберите только изображения', 'warning');
+    }
+    
+    if (imageFiles.length > 0) {
+        addBackgroundFiles(imageFiles);
+    }
 }
 
 function addPersonFiles(files) {
