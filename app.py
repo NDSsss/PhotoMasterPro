@@ -649,22 +649,28 @@ https://photo-master-pro-dddddd1997.replit.app"""
                 
                 if action == "remove_bg":
                     await process_remove_background(bot_token, chat_id, message, username)
+                    return {"status": "ok"}
                 elif action == "add_frame_photo":
                     await process_add_frame_photo(bot_token, chat_id, message, username, user_state)
+                    return {"status": "ok"}
                 elif action == "smart_crop_photo":
                     await process_smart_crop_photo(bot_token, chat_id, message, username, user_state)
-                elif action == "add_frame":
-                    await process_add_frame(bot_token, chat_id, message, username)
-                elif action == "smart_crop":
-                    await process_smart_crop(bot_token, chat_id, message, username)
+                    return {"status": "ok"}
+                elif action == "upload_frame":
+                    await process_custom_frame_upload(bot_token, chat_id, message, username, user_state)
+                    return {"status": "ok"}
                 elif action == "retouch":
                     await process_retouch(bot_token, chat_id, message, username)
+                    return {"status": "ok"}
                 elif action == "social_media":
                     await process_social_media(bot_token, chat_id, message, username)
+                    return {"status": "ok"}
                 elif action == "person_swap":
                     await process_person_swap(bot_token, chat_id, message, username, user_state)
+                    return {"status": "ok"}
                 elif action == "collage":
                     await process_collage(bot_token, chat_id, message, username, user_state)
+                    return {"status": "ok"}
                 else:
                     # No active action, show menu
                     response_text = """📸 *Фото получено!* 
@@ -1274,3 +1280,59 @@ async def process_crop_with_aspect(bot_token, chat_id, user_state, aspect_ratio,
     except Exception as e:
         logger.error(f"Error in process_crop_with_aspect: {e}")
         await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обрезке.")
+
+async def process_custom_frame_upload(bot_token, chat_id, message, username, user_state):
+    """Process custom frame upload"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Применяю вашу рамку...*\n\nПодождите немного!", "Markdown")
+        
+        # Get original photo and frame from user state
+        original_photo_id = user_state.get("photo_file_id")
+        frame_file_id = message["photo"][-1]["file_id"]
+        
+        if not original_photo_id:
+            await send_telegram_message(bot_token, chat_id, "❌ Исходное фото не найдено. Попробуйте еще раз.")
+            return
+            
+        # Download both photos
+        original_url = await download_telegram_photo(bot_token, original_photo_id)
+        frame_url = await download_telegram_photo(bot_token, frame_file_id)
+        
+        if original_url and frame_url:
+            from image_processor import ImageProcessor
+            import uuid
+            import aiofiles
+            import requests
+            
+            # Download and save photos
+            file_id = str(uuid.uuid4())
+            original_path = f"uploads/{file_id}_original.jpg"
+            frame_path = f"uploads/{file_id}_frame.jpg"
+            
+            # Download original
+            response = requests.get(original_url)
+            if response.status_code == 200:
+                async with aiofiles.open(original_path, 'wb') as f:
+                    await f.write(response.content)
+            
+            # Download frame
+            response = requests.get(frame_url)
+            if response.status_code == 200:
+                async with aiofiles.open(frame_path, 'wb') as f:
+                    await f.write(response.content)
+            
+            # Process with custom frame
+            processor = ImageProcessor()
+            result_path = await processor.add_custom_frame(original_path, frame_path, file_id)
+            
+            # Send result back
+            await send_telegram_photo(bot_token, chat_id, result_path, "✅ *Ваша рамка применена!*")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            
+        # Clear user state
+        user_state.clear()
+        
+    except Exception as e:
+        logger.error(f"Error in process_custom_frame_upload: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при применении рамки.")
