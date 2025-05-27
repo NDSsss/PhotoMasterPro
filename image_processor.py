@@ -635,12 +635,23 @@ class ImageProcessor:
             
             target_ratio = aspect_ratios.get(aspect_ratio, 1.0)
             
-            # Calculate crop dimensions based on target ratio
+            # Calculate crop dimensions based on target ratio with margin consideration
+            # Reserve space for margins (50% total - 25% on each side)
+            margin_factor = 0.5  # 50% total margin space
+            
             if target_ratio >= 1:  # Landscape or square
-                crop_height = min(height, int(width / target_ratio))
+                # For landscape crops, limit by height first, then calculate width
+                available_height = height * (1 - margin_factor)
+                available_width = width * (1 - margin_factor)
+                
+                crop_height = min(available_height, available_width / target_ratio)
                 crop_width = int(crop_height * target_ratio)
             else:  # Portrait
-                crop_width = min(width, int(height * target_ratio))
+                # For portrait crops, limit by width first, then calculate height
+                available_height = height * (1 - margin_factor)
+                available_width = width * (1 - margin_factor)
+                
+                crop_width = min(available_width, available_height * target_ratio)
                 crop_height = int(crop_width / target_ratio)
             
             # Define safety margins (25% from edges for better face protection)
