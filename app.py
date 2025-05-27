@@ -432,6 +432,53 @@ async def smart_crop(
         logger.error(f"Error in smart crop: {e}")
         raise HTTPException(status_code=500, detail="Error processing image")
 
+@app.post("/api/social-media-optimize")
+async def optimize_for_social_media(request: Request, file: UploadFile = File(...)):
+    """One-click social media optimization - creates versions for all major platforms"""
+    user = await get_current_user_optional(request)
+    
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    try:
+        # Save uploaded file
+        file_id = str(uuid.uuid4())
+        upload_path = f"uploads/{file_id}_{file.filename}"
+        
+        with open(upload_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process image for all social media platforms
+        result = await image_processor.optimize_for_social_media(upload_path, file_id)
+        
+        if result["success"]:
+            # Save to database if user is authenticated
+            if user:
+                db = get_db()
+                for platform, info in result["optimized_versions"].items():
+                    processed_image = ProcessedImage(
+                        user_id=user.id,
+                        original_filename=file.filename,
+                        processed_filename=os.path.basename(info["path"]),
+                        processing_type=f"social_media_{platform}"
+                    )
+                    db.add(processed_image)
+                db.commit()
+            
+            # Convert paths to web-accessible URLs
+            for platform, info in result["optimized_versions"].items():
+                info["path"] = f"/processed/{os.path.basename(info['path'])}"
+        
+        # Clean up upload
+        os.remove(upload_path)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in social media optimization: {e}")
+        raise HTTPException(status_code=500, detail="Error processing image")
+
 @app.post("/api/retouch")
 async def retouch_image(request: Request, file: UploadFile = File(...)):
     user = await get_current_user_optional(request)

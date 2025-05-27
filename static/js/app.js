@@ -328,6 +328,9 @@ async function handleProcess() {
             case 'smart-crop':
                 result = await processSmartCrop();
                 break;
+            case 'social-media':
+                result = await processSocialMediaOptimization();
+                break;
             default:
                 throw new Error('Неизвестный тип обработки');
         }

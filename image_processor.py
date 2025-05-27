@@ -802,6 +802,86 @@ class ImageProcessor:
             # Fallback: simple center crop and resize
             return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
+    async def optimize_for_social_media(self, image_path: str, file_id: str) -> dict:
+        """One-click social media optimization - creates optimized versions for all major platforms"""
+        try:
+            # Social media platform specifications
+            social_specs = {
+                "instagram_post": {"width": 1080, "height": 1080, "name": "Instagram Post (Square)"},
+                "instagram_story": {"width": 1080, "height": 1920, "name": "Instagram Story"},
+                "facebook_post": {"width": 1200, "height": 630, "name": "Facebook Post"},
+                "facebook_cover": {"width": 1200, "height": 315, "name": "Facebook Cover"},
+                "twitter_post": {"width": 1200, "height": 675, "name": "Twitter/X Post"},
+                "twitter_header": {"width": 1500, "height": 500, "name": "Twitter/X Header"},
+                "linkedin_post": {"width": 1200, "height": 627, "name": "LinkedIn Post"},
+                "linkedin_cover": {"width": 1584, "height": 396, "name": "LinkedIn Cover"},
+                "youtube_thumbnail": {"width": 1280, "height": 720, "name": "YouTube Thumbnail"},
+                "youtube_banner": {"width": 2560, "height": 1440, "name": "YouTube Banner"},
+                "pinterest_pin": {"width": 1000, "height": 1500, "name": "Pinterest Pin"},
+                "tiktok_video": {"width": 1080, "height": 1920, "name": "TikTok Video Cover"}
+            }
+            
+            # Load original image
+            img = Image.open(image_path)
+            img = img.convert("RGB")
+            original_width, original_height = img.size
+            
+            logger.info(f"📱 СОЦИАЛЬНЫЕ СЕТИ: Оптимизация изображения {original_width}x{original_height}")
+            
+            results = {}
+            
+            for platform, specs in social_specs.items():
+                try:
+                    # Create optimized version for each platform
+                    optimized_img = self._crop_to_exact_dimensions(img, specs["width"], specs["height"])
+                    
+                    # Save with compression optimized for web
+                    output_path = f"processed/{file_id}_{platform}.jpg"
+                    optimized_img.save(output_path, "JPEG", quality=85, optimize=True)
+                    
+                    results[platform] = {
+                        "path": output_path,
+                        "name": specs["name"],
+                        "dimensions": f"{specs['width']}x{specs['height']}",
+                        "file_size": self._get_file_size(output_path)
+                    }
+                    
+                    logger.info(f"✅ {specs['name']}: {output_path}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Error creating {specs['name']}: {e}")
+                    continue
+            
+            logger.info(f"📱 СОЦИАЛЬНЫЕ СЕТИ: Создано {len(results)} оптимизированных версий")
+            
+            return {
+                "success": True,
+                "original_dimensions": f"{original_width}x{original_height}",
+                "optimized_versions": results,
+                "total_created": len(results)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in social media optimization: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def _get_file_size(self, file_path: str) -> str:
+        """Get human-readable file size"""
+        try:
+            import os
+            size_bytes = os.path.getsize(file_path)
+            if size_bytes < 1024:
+                return f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                return f"{size_bytes / 1024:.1f} KB"
+            else:
+                return f"{size_bytes / (1024 * 1024):.1f} MB"
+        except:
+            return "Unknown"
+
     def _find_focal_point(self, img):
         """Find the most interesting point in the image - prioritize faces"""
         try:
