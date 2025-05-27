@@ -548,28 +548,112 @@ async def telegram_webhook(request: Request):
     """Handle Telegram webhook updates"""
     try:
         import json
-        
-        # Get headers for debugging
-        headers = dict(request.headers)
-        logger.info(f"=== WEBHOOK REQUEST ===")
-        logger.info(f"Headers: {headers}")
-        logger.info(f"Method: {request.method}")
-        logger.info(f"URL: {request.url}")
+        import requests
         
         # Get the raw update data
         update_data = await request.json()
-        logger.info(f"=== TELEGRAM UPDATE DATA ===")
-        logger.info(f"Raw update: {json.dumps(update_data, indent=2, ensure_ascii=False)}")
+        logger.info(f"Received Telegram update: {update_data.get('update_id', 'unknown')}")
         
-        # Check what type of update this is
+        # Get bot token
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not bot_token:
+            logger.error("TELEGRAM_BOT_TOKEN not found")
+            return {"status": "error", "message": "Bot token not configured"}
+        
+        # Extract message data
         if "message" in update_data:
             message = update_data["message"]
-            logger.info(f"Message from user {message.get('from', {}).get('username', 'unknown')}")
-            logger.info(f"Text: {message.get('text', 'No text')}")
-            logger.info(f"Chat ID: {message.get('chat', {}).get('id', 'unknown')}")
+            chat_id = message.get("chat", {}).get("id")
+            text = message.get("text", "")
+            user = message.get("from", {})
+            username = user.get("username", "unknown")
+            
+            logger.info(f"Processing message from {username}: {text}")
+            
+            # Simple command handling
+            response_text = ""
+            
+            if text == "/start":
+                response_text = """🎨 Добро пожаловать в PhotoProcessor Bot!
+
+Я помогу вам обработать ваши фотографии с помощью ИИ:
+
+📸 **Что я умею:**
+• Удалять фон с фотографий
+• Создавать коллажи и фотокарточки
+• Добавлять рамки
+• Умная обрезка под любой формат
+• Ретушь и улучшение качества
+• Замена фона на фотографиях
+
+📝 **Как пользоваться:**
+Просто отправьте мне фото, и я покажу все доступные варианты обработки!
+
+🔗 **Веб-версия:** https://photo-master-pro-dddddd1997.replit.app
+
+Отправьте любое фото для начала работы! 📷"""
+                
+            elif text == "/help":
+                response_text = """📋 **Помощь по PhotoProcessor Bot**
+
+🎯 **Основные функции:**
+• `/start` - Начать работу с ботом
+• `/help` - Показать эту справку
+
+📸 **Обработка фото:**
+Просто отправьте фото, и выберите нужную операцию:
+
+1️⃣ **Удаление фона** - Автоматическое удаление фона
+2️⃣ **Коллажи** - Создание красивых коллажей
+3️⃣ **Рамки** - Добавление декоративных рамок
+4️⃣ **Умная обрезка** - Обрезка под нужный формат
+5️⃣ **Ретушь** - Автоматическое улучшение качества
+
+💡 **Совет:** Для лучшего результата используйте фото хорошего качества!
+
+🌐 **Веб-версия доступна по ссылке:**
+https://photo-master-pro-dddddd1997.replit.app"""
+                
+            elif message.get("photo"):
+                response_text = """📸 Отличное фото! Выберите, что хотите сделать:
+
+🎨 **Доступные операции:**
+• Удалить фон
+• Создать коллаж 
+• Добавить рамку
+• Умная обрезка
+• Ретушь фото
+
+Напишите название операции или используйте веб-версию для полного функционала:
+https://photo-master-pro-dddddd1997.replit.app"""
+                
+            else:
+                response_text = """❓ Не понимаю эту команду.
+
+📝 Попробуйте:
+• `/start` - Начать работу
+• `/help` - Получить справку
+• Отправить фото для обработки
+
+🌐 Или используйте веб-версию:
+https://photo-master-pro-dddddd1997.replit.app"""
+            
+            # Send response back to Telegram
+            if response_text and chat_id:
+                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                payload = {
+                    "chat_id": chat_id,
+                    "text": response_text,
+                    "parse_mode": "Markdown"
+                }
+                
+                response = requests.post(telegram_url, json=payload)
+                if response.status_code == 200:
+                    logger.info(f"Sent response to {username}")
+                else:
+                    logger.error(f"Failed to send response: {response.text}")
         
-        # Simple response for webhook testing
-        return {"status": "ok", "received": True}
+        return {"status": "ok"}
         
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")

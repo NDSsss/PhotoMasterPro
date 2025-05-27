@@ -17,27 +17,29 @@ class TelegramBot:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN", "your-bot-token-here")
         self.image_processor = ImageProcessor()
         self.user_states = {}  # Store user states for multi-step operations
+        self.application = None
         
     async def start(self):
-        """Start the Telegram bot"""
+        """Initialize the Telegram bot application for webhook"""
         if self.token == "your-bot-token-here":
             logger.warning("Telegram bot token not configured, skipping bot startup")
             return
             
         try:
-            application = Application.builder().token(self.token).build()
+            if not self.application:
+                self.application = Application.builder().token(self.token).build()
             
             # Add handlers
-            application.add_handler(CommandHandler("start", self.start_command))
-            application.add_handler(CommandHandler("help", self.help_command))
-            application.add_handler(CommandHandler("done", self.handle_done_command))
-            application.add_handler(CallbackQueryHandler(self.button_callback))
-            application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
+            self.application.add_handler(CommandHandler("start", self.start_command))
+            self.application.add_handler(CommandHandler("help", self.help_command))
+            self.application.add_handler(CommandHandler("done", self.handle_done_command))
+            self.application.add_handler(CallbackQueryHandler(self.button_callback))
+            self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+            self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
             
             # Start the bot
-            await application.initialize()
-            await application.start()
+            await self.application.initialize()
+            await self.application.start()
             await application.updater.start_polling()
             
             logger.info("Telegram bot started successfully")
