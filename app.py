@@ -1172,17 +1172,87 @@ async def process_person_swap(bot_token, chat_id, message, username, user_state)
         step = user_state.get("step", "person")
         
         if step == "person":
-            await send_telegram_message(bot_token, chat_id, "✅ *Фото человека получено!*\n\nТеперь отправьте фото с желаемым фоном.", "Markdown")
+            # Save person photo
+            person_file_id = message["photo"][-1]["file_id"]
+            user_state["person_file_id"] = person_file_id
             user_state["step"] = "background"
+            await send_telegram_message(bot_token, chat_id, "✅ *Фото человека получено!*\n\nТеперь отправьте фото с желаемым фоном.", "Markdown")
         else:
+            # Process person swap with both photos
             await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nВыполняю замену фона!", "Markdown")
-            await send_telegram_message(bot_token, chat_id, 
-                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
-                "Markdown")
+            
+            # Create uploads directory if it doesn't exist
+            os.makedirs("uploads", exist_ok=True)
+            
+            # Get both photos
+            person_file_id = user_state.get("person_file_id")
+            background_file_id = message["photo"][-1]["file_id"]
+            
+            if not person_file_id:
+                await send_telegram_message(bot_token, chat_id, "❌ Фото человека не найдено. Попробуйте еще раз.")
+                return
+                
+            # Download both photos
+            person_url = await download_telegram_photo(bot_token, person_file_id)
+            background_url = await download_telegram_photo(bot_token, background_file_id)
+            
+            if not person_url or not background_url:
+                await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фотографий.")
+                return
+                
+            # Download and save photos to files
+            import uuid
+            import aiofiles
+            import requests
+            
+            unique_id = str(uuid.uuid4())
+            person_path = f"uploads/{unique_id}_person.jpg"
+            background_path = f"uploads/{unique_id}_background.jpg"
+            
+            # Download person photo
+            person_response = requests.get(person_url)
+            if person_response.status_code != 200:
+                await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото человека.")
+                return
+                
+            async with aiofiles.open(person_path, 'wb') as f:
+                await f.write(person_response.content)
+            
+            # Download background photo
+            background_response = requests.get(background_url)
+            if background_response.status_code != 200:
+                await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото фона.")
+                return
+                
+            async with aiofiles.open(background_path, 'wb') as f:
+                await f.write(background_response.content)
+            
+            # Process with ImageProcessor
+            from image_processor import ImageProcessor
+            processor = ImageProcessor()
+            result_paths = await processor.person_swap_separate([person_path], [background_path], unique_id)
+            
+            if result_paths and len(result_paths) > 0:
+                # Send first result back to chat
+                await send_telegram_photo(bot_token, chat_id, result_paths[0], "✅ *Замена фона выполнена!*\n\nЧеловек успешно перенесен на новый фон.")
+            else:
+                await send_telegram_message(bot_token, chat_id, "❌ Не удалось выполнить замену фона.")
+            
+            # Clean up files
+            try:
+                os.remove(person_path)
+                os.remove(background_path)
+            except:
+                pass
+                
+            # Clear user state
+            user_state.clear()
             
     except Exception as e:
         logger.error(f"Error in process_person_swap: {e}")
-        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Произошла ошибка при замене фона: {str(e)}")
 
 async def process_collage(bot_token, chat_id, message, username, user_state):
     """Process collage creation"""
