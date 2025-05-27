@@ -616,14 +616,11 @@ class ImageProcessor:
             raise
 
     async def smart_crop(self, image_path: str, aspect_ratio: str, file_id: str) -> str:
-        """Smart crop image to desired aspect ratio with face detection focus"""
+        """Smart crop image to desired aspect ratio with intelligent focus"""
         try:
-            # Load image with PIL and OpenCV
+            # Load image with PIL
             img = Image.open(image_path)
             width, height = img.size
-            
-            # Convert to OpenCV format for face detection
-            img_cv = cv2.imread(image_path)
             
             # Parse aspect ratio
             aspect_ratios = {
@@ -646,55 +643,40 @@ class ImageProcessor:
                 crop_width = min(width, int(height * target_ratio))
                 crop_height = int(crop_width / target_ratio)
             
-            # Try to find faces using OpenCV
-            face_center_x, face_center_y = None, None
-            try:
-                # Load face cascade
-                face_cascade = cv2.CascadeClassifier()
-                cascade_loaded = False
-                
-                # Try to load face cascade from different locations
-                for cascade_file in ['/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml']:
-                    if face_cascade.load(cascade_file):
-                        cascade_loaded = True
-                        break
-                
-                if cascade_loaded and img_cv is not None:
-                    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-                    
-                    if len(faces) > 0:
-                        # Find the face closest to horizontal center
-                        center_x = width // 2
-                        best_face = None
-                        min_distance = float('inf')
-                        
-                        for (x, y, w, h) in faces:
-                            face_x = x + w // 2
-                            distance = abs(face_x - center_x)
-                            if distance < min_distance:
-                                min_distance = distance
-                                best_face = (x, y, w, h)
-                        
-                        if best_face:
-                            x, y, w, h = best_face
-                            face_center_x = x + w // 2
-                            face_center_y = y + h // 2
-                            logger.info(f"Face detected at ({face_center_x}, {face_center_y})")
-            except Exception as e:
-                logger.info(f"Face detection failed: {e}, using center crop")
-            
-            # Calculate crop position
-            if face_center_x is not None and face_center_y is not None:
-                # Center crop around face
-                left = max(0, min(face_center_x - crop_width // 2, width - crop_width))
-                top = max(0, min(face_center_y - crop_height // 2, height - crop_height))
-                logger.info(f"Cropping around face: left={left}, top={top}")
-            else:
-                # Fall back to center crop
+            # Smart positioning logic
+            # For portraits (tall images), bias towards upper portion to avoid cutting heads
+            if height > width * 1.2:  # Portrait orientation
+                # Position crop towards upper part of image
+                if target_ratio > 1:  # Making it landscape - focus on upper 40%
+                    top = int(height * 0.1)  # Start from 10% down
+                else:  # Keeping portrait - center with slight upward bias
+                    top = max(0, (height - crop_height) // 2 - int(height * 0.1))
+                top = min(top, height - crop_height)
                 left = (width - crop_width) // 2
+                logger.info(f"Portrait detected, biasing upward: top={top}")
+            
+            # For landscapes, try to find most interesting area
+            elif width > height * 1.5:  # Landscape orientation
+                # Center crop with slight bias towards rule of thirds
                 top = (height - crop_height) // 2
-                logger.info("Using center crop")
+                left = (width - crop_width) // 2
+                logger.info("Landscape detected, using center crop")
+            
+            # For square-ish images, use smart analysis
+            else:
+                # Analyze image brightness/contrast to find focal point
+                focal_x, focal_y = self._find_focal_point(img)
+                
+                if focal_x is not None and focal_y is not None:
+                    # Center crop around focal point
+                    left = max(0, min(focal_x - crop_width // 2, width - crop_width))
+                    top = max(0, min(focal_y - crop_height // 2, height - crop_height))
+                    logger.info(f"Focal point detected at ({focal_x}, {focal_y}), cropping around it")
+                else:
+                    # Default center crop with upward bias for potential faces
+                    left = (width - crop_width) // 2
+                    top = max(0, (height - crop_height) // 2 - int(height * 0.1))
+                    logger.info("Using center crop with upward bias")
             
             right = left + crop_width
             bottom = top + crop_height
@@ -712,6 +694,57 @@ class ImageProcessor:
         except Exception as e:
             logger.error(f"Error in smart crop: {e}")
             raise
+
+    def _find_focal_point(self, img):
+        """Find the most interesting point in the image using simple analysis"""
+        try:
+            # Convert to grayscale for analysis
+            gray = img.convert('L')
+            width, height = gray.size
+            
+            # Sample key points and find highest contrast area
+            best_score = 0
+            best_x, best_y = None, None
+            
+            # Check upper third of image (where faces usually are)
+            for y in range(int(height * 0.2), int(height * 0.6), max(1, height // 20)):
+                for x in range(int(width * 0.2), int(width * 0.8), max(1, width // 20)):
+                    # Calculate local contrast
+                    score = self._calculate_local_contrast(gray, x, y)
+                    if score > best_score:
+                        best_score = score
+                        best_x, best_y = x, y
+            
+            return best_x, best_y if best_score > 0 else (None, None)
+        except:
+            return None, None
+
+    def _calculate_local_contrast(self, gray_img, x, y):
+        """Calculate local contrast around a point"""
+        try:
+            width, height = gray_img.size
+            window = 20  # Size of analysis window
+            
+            x1 = max(0, x - window)
+            x2 = min(width, x + window)
+            y1 = max(0, y - window)
+            y2 = min(height, y + window)
+            
+            # Crop local area
+            local_area = gray_img.crop((x1, y1, x2, y2))
+            pixels = list(local_area.getdata())
+            
+            if not pixels:
+                return 0
+            
+            # Calculate standard deviation as contrast measure
+            mean_val = sum(pixels) / len(pixels)
+            variance = sum((p - mean_val) ** 2 for p in pixels) / len(pixels)
+            contrast = variance ** 0.5
+            
+            return contrast
+        except:
+            return 0
     
     async def retouch_image(self, image_path: str, file_id: str) -> str:
         """Perform automatic retouching"""
