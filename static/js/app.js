@@ -813,40 +813,46 @@ function showResults(result) {
     let downloadButtons = '';
     
     // Handle social media optimization results
-    if (result.optimized_versions) {
-        console.log('Processing social media optimization results');
+    if (result && result.optimized_versions) {
+        console.log('Processing social media optimization results:', result);
         
         imagesHTML = '<div class="row g-3">';
         downloadButtons = '<div class="mb-3"><h5>Скачать по платформам:</h5></div>';
         
-        Object.entries(result.optimized_versions).forEach(([platform, info]) => {
-            imagesHTML += `
-                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
-                    <div class="card h-100">
-                        <img src="${info.path}" class="card-img-top result-image" alt="${info.name}" style="height: 150px; object-fit: cover;">
-                        <div class="card-body p-2">
-                            <h6 class="card-title mb-1" style="font-size: 0.85rem;">${info.name}</h6>
-                            <small class="text-muted d-block">${info.dimensions}</small>
-                            <small class="text-muted">${info.file_size}</small>
+        try {
+            Object.entries(result.optimized_versions).forEach(([platform, info]) => {
+                console.log('Processing platform:', platform, info);
+                imagesHTML += `
+                    <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                        <div class="card h-100">
+                            <img src="${info.path}" class="card-img-top result-image" alt="${info.name}" style="height: 150px; object-fit: cover;">
+                            <div class="card-body p-2">
+                                <h6 class="card-title mb-1" style="font-size: 0.85rem;">${info.name}</h6>
+                                <small class="text-muted d-block">${info.dimensions}</small>
+                                <small class="text-muted">${info.file_size}</small>
+                            </div>
                         </div>
                     </div>
+                `;
+                
+                downloadButtons += `
+                    <a href="${info.path}" download class="btn btn-outline-primary btn-sm me-2 mb-2">
+                        <i class="fas fa-download me-1"></i>
+                        ${info.name}
+                    </a>
+                `;
+            });
+            
+            imagesHTML += '</div>';
+            downloadButtons += `
+                <div class="mt-3">
+                    <small class="text-muted">Создано ${result.total_created} оптимизированных версий из оригинала ${result.original_dimensions}</small>
                 </div>
             `;
-            
-            downloadButtons += `
-                <a href="${info.path}" download class="btn btn-outline-primary btn-sm me-2 mb-2">
-                    <i class="fas fa-download me-1"></i>
-                    ${info.name}
-                </a>
-            `;
-        });
-        
-        imagesHTML += '</div>';
-        downloadButtons += `
-            <div class="mt-3">
-                <small class="text-muted">Создано ${result.total_created} оптимизированных версий из оригинала ${result.original_dimensions}</small>
-            </div>
-        `;
+        } catch (error) {
+            console.error('Error processing social media results:', error);
+            imagesHTML = '<div class="alert alert-warning">Ошибка отображения результатов</div>';
+        }
     }
     // Handle regular results
     else {
