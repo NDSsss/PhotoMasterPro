@@ -30,6 +30,7 @@ class TelegramBot:
             # Add handlers
             application.add_handler(CommandHandler("start", self.start_command))
             application.add_handler(CommandHandler("help", self.help_command))
+            application.add_handler(CommandHandler("done", self.handle_done_command))
             application.add_handler(CallbackQueryHandler(self.button_callback))
             application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
@@ -133,8 +134,21 @@ class TelegramBot:
         # Check if user is in a specific workflow
         if user_id in self.user_states:
             state = self.user_states[user_id]
+            current_state = state.get("state", "")
             
-            if state.get("action") == "remove_background":
+            # New state-based handling
+            if current_state == "waiting_bg_photo":
+                await self.process_background_removal_with_method(update, context)
+            elif current_state == "waiting_person_photo":
+                await self.collect_person_photo(update, context)
+            elif current_state == "waiting_background_photos":
+                await self.collect_background_photos(update, context)
+            elif current_state == "waiting_frame_photo":
+                await self.collect_frame_photo(update, context)
+            elif current_state == "waiting_custom_frame":
+                await self.process_custom_frame(update, context)
+            # Legacy action-based handling
+            elif state.get("action") == "remove_background":
                 await self.process_background_removal(update, context)
             elif state.get("action") == "add_frame":
                 await self.show_frame_options(update, context)
@@ -611,3 +625,191 @@ class TelegramBot:
         
         # Clear state
         del self.user_states[user_id]
+
+    async def request_photo_for_background_removal_with_method(self, query, context, method):
+        """Request photo for background removal with selected method"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = {
+            "state": "waiting_bg_photo",
+            "bg_method": method
+        }
+        
+        method_name = "REMBG" if method == "rembg" else "LBM"
+        await query.edit_message_text(
+            f"🔄 **Удаление фона ({method_name})**\n\n"
+            f"Отправьте фотографию для удаления фона.\n\n"
+            f"📸 Метод: {method_name}",
+            parse_mode='Markdown'
+        )
+
+    async def process_background_removal_with_method(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Process background removal with selected method"""
+        user_id = update.effective_user.id
+        
+        if user_id not in self.user_states:
+            await update.message.reply_text("Ошибка: состояние не найдено.")
+            return
+        
+        method = self.user_states[user_id].get("bg_method", "rembg")
+        
+        try:
+            # Download photo
+            photo = update.message.photo[-1]
+            file_info = await context.bot.get_file(photo.file_id)
+            file_path = f"uploads/{photo.file_id}.jpg"
+            await file_info.download_to_drive(file_path)
+            
+            await update.message.reply_text("🔄 Удаляю фон...")
+            
+            # Process with selected method
+            processor = ImageProcessor()
+            file_id = str(uuid.uuid4())
+            output_path = await processor.remove_background(file_path, file_id, method)
+            
+            if output_path:
+                with open(output_path, 'rb') as photo_file:
+                    await update.message.reply_photo(
+                        photo=photo_file,
+                        caption=f"✅ Фон удален методом {method.upper()}!"
+                    )
+            else:
+                await update.message.reply_text("❌ Ошибка при удалении фона")
+            
+            # Cleanup
+            os.remove(file_path)
+            del self.user_states[user_id]
+            
+        except Exception as e:
+            logger.error(f"Error in background removal: {e}")
+            await update.message.reply_text("❌ Произошла ошибка при обработке")
+
+    async def collect_person_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Collect person photo for background swapping"""
+        user_id = update.effective_user.id
+        
+        try:
+            # Download photo
+            photo = update.message.photo[-1]
+            file_info = await context.bot.get_file(photo.file_id)
+            file_path = f"uploads/{photo.file_id}_person.jpg"
+            await file_info.download_to_drive(file_path)
+            
+            self.user_states[user_id]["person_photos"].append(file_path)
+            
+            await update.message.reply_text("✅ Фото человека получено!")
+            await self.request_backgrounds_for_person_swap(update, context)
+            
+        except Exception as e:
+            logger.error(f"Error collecting person photo: {e}")
+            await update.message.reply_text("❌ Ошибка при загрузке фото")
+
+    async def collect_background_photos(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Collect background photos for person swapping"""
+        user_id = update.effective_user.id
+        
+        try:
+            # Download photo
+            photo = update.message.photo[-1]
+            file_info = await context.bot.get_file(photo.file_id)
+            file_path = f"uploads/{photo.file_id}_bg.jpg"
+            await file_info.download_to_drive(file_path)
+            
+            self.user_states[user_id]["background_photos"].append(file_path)
+            count = len(self.user_states[user_id]["background_photos"])
+            
+            await update.message.reply_text(
+                f"✅ Фон {count} добавлен!\n\n"
+                f"📸 Можете добавить еще фоны или отправить /done для завершения"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error collecting background photo: {e}")
+            await update.message.reply_text("❌ Ошибка при загрузке фото")
+
+    async def collect_frame_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Collect photo for frame addition"""
+        user_id = update.effective_user.id
+        
+        try:
+            # Download photo
+            photo = update.message.photo[-1]
+            file_info = await context.bot.get_file(photo.file_id)
+            file_path = f"uploads/{photo.file_id}_frame.jpg"
+            await file_info.download_to_drive(file_path)
+            
+            self.user_states[user_id]["photo_path"] = file_path
+            
+            await update.message.reply_text("✅ Фото получено!")
+            await self.show_frame_type_options(update, context)
+            
+        except Exception as e:
+            logger.error(f"Error collecting frame photo: {e}")
+            await update.message.reply_text("❌ Ошибка при загрузке фото")
+
+    async def show_frame_type_options(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show frame type options"""
+        keyboard = [
+            [InlineKeyboardButton("🖼️ Классическая", callback_data="frame_classic")],
+            [InlineKeyboardButton("🌸 Винтажная", callback_data="frame_vintage")],
+            [InlineKeyboardButton("✨ Современная", callback_data="frame_modern")],
+            [InlineKeyboardButton("📤 Свою рамку", callback_data="frame_custom")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "🖼️ **Добавление рамки**\n\n"
+            "Выберите тип рамки:",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+
+    async def process_custom_frame(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Process custom frame upload"""
+        user_id = update.effective_user.id
+        
+        if user_id not in self.user_states or "photo_path" not in self.user_states[user_id]:
+            await update.message.reply_text("Ошибка: основное фото не найдено.")
+            return
+        
+        try:
+            # Download frame photo
+            photo = update.message.photo[-1]
+            file_info = await context.bot.get_file(photo.file_id)
+            frame_path = f"uploads/{photo.file_id}_custom_frame.jpg"
+            await file_info.download_to_drive(frame_path)
+            
+            await update.message.reply_text("🔄 Добавляю вашу рамку...")
+            
+            # Process with custom frame
+            processor = ImageProcessor()
+            file_id = str(uuid.uuid4())
+            photo_path = self.user_states[user_id]["photo_path"]
+            
+            output_path = await processor.add_custom_frame(photo_path, frame_path, file_id)
+            
+            if output_path:
+                with open(output_path, 'rb') as result_photo:
+                    await update.message.reply_photo(
+                        photo=result_photo,
+                        caption="✅ Рамка добавлена!"
+                    )
+            else:
+                await update.message.reply_text("❌ Ошибка при добавлении рамки")
+            
+            # Cleanup
+            os.remove(photo_path)
+            os.remove(frame_path)
+            del self.user_states[user_id]
+            
+        except Exception as e:
+            logger.error(f"Error processing custom frame: {e}")
+            await update.message.reply_text("❌ Произошла ошибка при обработке")
+
+    async def handle_done_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /done command for finishing background collection"""
+        user_id = update.effective_user.id
+        
+        if user_id in self.user_states and self.user_states[user_id].get("state") == "waiting_background_photos":
+            await self.process_person_swap_final(update, context)
+        else:
+            await update.message.reply_text("Команда /done используется только при сборе фонов для подстановки человека.")
