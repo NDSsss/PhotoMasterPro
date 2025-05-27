@@ -1255,8 +1255,15 @@ async def download_telegram_photo(bot_token, file_id):
 async def send_telegram_photo(bot_token, chat_id, photo_path, caption=""):
     """Send photo to Telegram chat"""
     import requests
+    import os
     
     try:
+        # Check if file exists
+        if not os.path.exists(photo_path):
+            logger.error(f"Photo file not found: {photo_path}")
+            await send_telegram_message(bot_token, chat_id, f"❌ Ошибка: обработанный файл не найден")
+            return False
+            
         url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
         
         with open(photo_path, 'rb') as photo:
@@ -1267,14 +1274,22 @@ async def send_telegram_photo(bot_token, chat_id, photo_path, caption=""):
                 'parse_mode': 'Markdown'
             }
             
-            response = requests.post(url, files=files, data=data)
+            response = requests.post(url, files=files, data=data, timeout=30)
+            
             if response.status_code == 200:
                 logger.info(f"Photo sent successfully to chat {chat_id}")
+                return True
             else:
-                logger.error(f"Failed to send photo: {response.text}")
+                logger.error(f"Failed to send photo: {response.status_code} - {response.text}")
+                await send_telegram_message(bot_token, chat_id, f"❌ Ошибка отправки результата. Попробуйте еще раз.")
+                return False
                 
     except Exception as e:
         logger.error(f"Error sending photo: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Ошибка при отправке результата: {str(e)}")
+        return False
 
 async def send_telegram_message_with_keyboard(bot_token, chat_id, text, parse_mode=None, keyboard=None):
     """Send message with inline keyboard to Telegram"""
