@@ -647,50 +647,52 @@ class ImageProcessor:
             margin_x = int(crop_width * 0.15)
             margin_y = int(crop_height * 0.15)
             
-            # Smart positioning logic
-            # For portraits (tall images), bias towards upper portion to avoid cutting heads
-            if height > width * 1.2:  # Portrait orientation
-                # Position crop towards upper part of image
-                if target_ratio > 1:  # Making it landscape - focus on upper 40%
-                    top = int(height * 0.1)  # Start from 10% down
-                else:  # Keeping portrait - center with slight upward bias
-                    top = max(0, (height - crop_height) // 2 - int(height * 0.1))
-                top = min(top, height - crop_height)
-                left = (width - crop_width) // 2
-                logger.info(f"Portrait detected, biasing upward: top={top}")
+            # Always try to find focal point first for all image types
+            focal_x, focal_y = self._find_focal_point(img)
             
-            # For landscapes, try to find most interesting area
-            elif width > height * 1.5:  # Landscape orientation
-                # Center crop with slight bias towards rule of thirds
-                top = (height - crop_height) // 2
-                left = (width - crop_width) // 2
-                logger.info("Landscape detected, using center crop")
-            
-            # For square-ish images, use smart analysis
-            else:
-                # Analyze image brightness/contrast to find focal point
-                focal_x, focal_y = self._find_focal_point(img)
+            # Smart positioning logic with margins applied to ALL cases
+            if focal_x is not None and focal_y is not None:
+                # Center crop around focal point with safety margins
+                left = int(focal_x) - crop_width // 2
+                top = int(focal_y) - crop_height // 2
                 
-                if focal_x is not None and focal_y is not None:
-                    # Center crop around focal point with safety margins
-                    left = max(margin_x, min(int(focal_x) - crop_width // 2, width - crop_width - margin_x))
-                    top = max(margin_y, min(int(focal_y) - crop_height // 2, height - crop_height - margin_y))
-                    
-                    # Ensure we don't go beyond image boundaries
-                    left = max(0, min(left, width - crop_width))
-                    top = max(0, min(top, height - crop_height))
-                    
-                    logger.info(f"Focal point detected at ({focal_x}, {focal_y}), cropping with margins at ({left}, {top})")
+                # Apply safety margins - ensure focal point isn't too close to edges
+                left = max(margin_x, min(left, width - crop_width - margin_x))
+                top = max(margin_y, min(top, height - crop_height - margin_y))
+                
+                # Final boundary check
+                left = max(0, min(left, width - crop_width))
+                top = max(0, min(top, height - crop_height))
+                
+                logger.info(f"Focal point detected at ({focal_x}, {focal_y}), cropping with 15% margins at ({left}, {top})")
+            
+            # Fallback positioning with margins based on image orientation
+            else:
+                # For portraits (tall images), bias towards upper portion to avoid cutting heads
+                if height > width * 1.2:  # Portrait orientation
+                    # Position crop towards upper part of image with margins
+                    if target_ratio > 1:  # Making it landscape - focus on upper 40%
+                        top = max(margin_y, int(height * 0.1))
+                    else:  # Keeping portrait - center with slight upward bias
+                        top = max(margin_y, (height - crop_height) // 2 - int(height * 0.1))
+                    left = max(margin_x, (width - crop_width) // 2)
+                    logger.info(f"Portrait fallback with margins: top={top}, left={left}")
+                
+                # For landscapes, center with margins
+                elif width > height * 1.5:  # Landscape orientation
+                    top = max(margin_y, (height - crop_height) // 2)
+                    left = max(margin_x, (width - crop_width) // 2)
+                    logger.info(f"Landscape fallback with margins: top={top}, left={left}")
+                
+                # For square-ish images, center with upward bias and margins
                 else:
-                    # Default center crop with upward bias for potential faces and margins
                     left = max(margin_x, (width - crop_width) // 2)
                     top = max(margin_y, (height - crop_height) // 2 - int(height * 0.1))
-                    
-                    # Ensure we don't go beyond image boundaries
-                    left = max(0, min(left, width - crop_width))
-                    top = max(0, min(top, height - crop_height))
-                    
-                    logger.info(f"Using center crop with upward bias and margins at ({left}, {top})")
+                    logger.info(f"Square fallback with margins: top={top}, left={left}")
+                
+                # Final boundary check for fallback positioning
+                left = max(0, min(left, width - crop_width))
+                top = max(0, min(top, height - crop_height))
             
             right = left + crop_width
             bottom = top + crop_height
