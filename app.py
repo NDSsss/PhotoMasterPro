@@ -915,15 +915,56 @@ async def process_remove_background(bot_token, chat_id, message, username):
     try:
         await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nУдаляю фон, подождите немного!", "Markdown")
         
-        # For now, send a demo result message since image processing might have issues
-        # TODO: Replace with actual image processing when it's working
-        await send_telegram_message(bot_token, chat_id, 
-            "✅ *Демо-результат*\n\nФон удален! Для полной обработки используйте:\n🌐 https://photo-master-pro-dddddd1997.replit.app", 
-            "Markdown")
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
+        
+        # Get the highest quality photo (last in the array)
+        photo = message["photo"][-1]  # Telegram sends photos in ascending quality order
+        file_id = photo["file_id"]
+        
+        # Download photo from Telegram
+        photo_url = await download_telegram_photo(bot_token, file_id)
+        if not photo_url:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка получения фото из Telegram.")
+            return
+            
+        # Download and save photo to file
+        import uuid
+        import aiofiles
+        import requests
+        
+        unique_id = str(uuid.uuid4())
+        input_path = f"uploads/{unique_id}_input.jpg"
+        
+        # Download photo data
+        photo_response = requests.get(photo_url)
+        if photo_response.status_code != 200:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            return
+            
+        # Save photo to file
+        async with aiofiles.open(input_path, 'wb') as f:
+            await f.write(photo_response.content)
+        
+        # Process with ImageProcessor
+        from image_processor import ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.remove_background(input_path, unique_id, "rembg")
+        
+        # Send processed photo back to chat
+        await send_telegram_photo(bot_token, chat_id, result_path, "✅ *Фон удален!*")
+        
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
             
     except Exception as e:
         logger.error(f"Error in process_remove_background: {e}")
-        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Произошла ошибка при обработке фото: {str(e)}")
 
 async def process_add_frame_photo(bot_token, chat_id, message, username, user_state):
     """Process frame addition - first get photo, then show frame options"""
@@ -1033,34 +1074,114 @@ async def process_retouch(bot_token, chat_id, message, username):
     try:
         await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nВыполняю ретушь!", "Markdown")
         
-        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
-        if photo_url:
-            await send_telegram_message(bot_token, chat_id, 
-                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
-                "Markdown")
-        else:
-            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
+        
+        # Get the highest quality photo
+        photo = message["photo"][-1]
+        file_id = photo["file_id"]
+        
+        # Download photo from Telegram
+        photo_url = await download_telegram_photo(bot_token, file_id)
+        if not photo_url:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка получения фото из Telegram.")
+            return
+            
+        # Download and save photo to file
+        import uuid
+        import aiofiles
+        import requests
+        
+        unique_id = str(uuid.uuid4())
+        input_path = f"uploads/{unique_id}_input.jpg"
+        
+        # Download photo data
+        photo_response = requests.get(photo_url)
+        if photo_response.status_code != 200:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            return
+            
+        # Save photo to file
+        async with aiofiles.open(input_path, 'wb') as f:
+            await f.write(photo_response.content)
+        
+        # Process with ImageProcessor
+        from image_processor import ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.retouch_image(input_path, unique_id)
+        
+        # Send processed photo back to chat
+        await send_telegram_photo(bot_token, chat_id, result_path, "✅ *Ретушь выполнена!*\n\nФото улучшено и готово к использованию.")
+        
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
             
     except Exception as e:
         logger.error(f"Error in process_retouch: {e}")
-        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Произошла ошибка при ретуши: {str(e)}")
 
 async def process_social_media(bot_token, chat_id, message, username):
     """Process social media optimization"""
     try:
         await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nСоздаю версии для соцсетей!", "Markdown")
         
-        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
-        if photo_url:
-            await send_telegram_message(bot_token, chat_id, 
-                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
-                "Markdown")
-        else:
-            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
+        
+        # Get the highest quality photo
+        photo = message["photo"][-1]
+        file_id = photo["file_id"]
+        
+        # Download photo from Telegram
+        photo_url = await download_telegram_photo(bot_token, file_id)
+        if not photo_url:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка получения фото из Telegram.")
+            return
+            
+        # Download and save photo to file
+        import uuid
+        import aiofiles
+        import requests
+        
+        unique_id = str(uuid.uuid4())
+        input_path = f"uploads/{unique_id}_input.jpg"
+        
+        # Download photo data
+        photo_response = requests.get(photo_url)
+        if photo_response.status_code != 200:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            return
+            
+        # Save photo to file
+        async with aiofiles.open(input_path, 'wb') as f:
+            await f.write(photo_response.content)
+        
+        # Process with ImageProcessor
+        from image_processor import ImageProcessor
+        processor = ImageProcessor()
+        result_data = await processor.optimize_for_social_media(input_path, unique_id)
+        
+        # Send summary message about created versions
+        await send_telegram_message(bot_token, chat_id, 
+            f"✅ *Оптимизация завершена!*\n\nСоздано {len(result_data.get('versions', []))} версий для разных платформ.\n\n🔗 Скачайте все версии на сайте:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+            "Markdown")
+        
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
             
     except Exception as e:
         logger.error(f"Error in process_social_media: {e}")
-        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Произошла ошибка при оптимизации: {str(e)}")
 
 async def process_person_swap(bot_token, chat_id, message, username, user_state):
     """Process person swap"""
@@ -1178,61 +1299,135 @@ async def process_frame_with_type(bot_token, chat_id, user_state, frame_type, us
     try:
         await send_telegram_message(bot_token, chat_id, "🔄 *Добавляю рамку...*\n\nПодождите немного!", "Markdown")
         
-        # Simulate processing time
-        import asyncio
-        await asyncio.sleep(1)
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
         
-        # Frame descriptions
+        # Get photo from user state
+        photo_file_id = user_state.get("photo_file_id")
+        if not photo_file_id:
+            await send_telegram_message(bot_token, chat_id, "❌ Фото не найдено. Попробуйте еще раз.")
+            return
+            
+        # Download photo from Telegram
+        photo_url = await download_telegram_photo(bot_token, photo_file_id)
+        if not photo_url:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка получения фото из Telegram.")
+            return
+            
+        # Download and save photo to file
+        import uuid
+        import aiofiles
+        import requests
+        
+        unique_id = str(uuid.uuid4())
+        input_path = f"uploads/{unique_id}_input.jpg"
+        
+        # Download photo data
+        photo_response = requests.get(photo_url)
+        if photo_response.status_code != 200:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            return
+            
+        # Save photo to file
+        async with aiofiles.open(input_path, 'wb') as f:
+            await f.write(photo_response.content)
+        
+        # Process with ImageProcessor
+        from image_processor import ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.add_frame(input_path, frame_type, unique_id)
+        
+        # Send processed photo back to chat
         frame_descriptions = {
             "classic": "классическая золотая рамка",
             "modern": "современная минималистичная рамка", 
             "vintage": "винтажная деревянная рамка"
         }
-        
         description = frame_descriptions.get(frame_type, frame_type)
+        await send_telegram_photo(bot_token, chat_id, result_path, f"✅ *Рамка добавлена!*\n\nПрименена {description}")
         
-        # Send demo result
-        await send_telegram_message(bot_token, chat_id, 
-            f"✅ *Рамка добавлена!*\n\nПрименена {description}.\n\n🔗 Для получения реального результата используйте веб-версию:\nhttps://photo-master-pro-dddddd1997.replit.app", 
-            "Markdown")
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
             
         # Clear user state
         user_state.clear()
         
     except Exception as e:
         logger.error(f"Error in process_frame_with_type: {e}")
-        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при добавлении рамки.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Произошла ошибка при добавлении рамки: {str(e)}")
 
 async def process_crop_with_aspect(bot_token, chat_id, user_state, aspect_ratio, username):
     """Process smart crop with selected aspect ratio"""
     try:
         await send_telegram_message(bot_token, chat_id, "🔄 *Выполняю умную обрезку...*\n\nПодождите немного!", "Markdown")
         
-        # Simulate processing time
-        import asyncio
-        await asyncio.sleep(1)
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
         
-        # Aspect ratio descriptions
+        # Get photo from user state
+        photo_file_id = user_state.get("photo_file_id")
+        if not photo_file_id:
+            await send_telegram_message(bot_token, chat_id, "❌ Фото не найдено. Попробуйте еще раз.")
+            return
+            
+        # Download photo from Telegram
+        photo_url = await download_telegram_photo(bot_token, photo_file_id)
+        if not photo_url:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка получения фото из Telegram.")
+            return
+            
+        # Download and save photo to file
+        import uuid
+        import aiofiles
+        import requests
+        
+        unique_id = str(uuid.uuid4())
+        input_path = f"uploads/{unique_id}_input.jpg"
+        
+        # Download photo data
+        photo_response = requests.get(photo_url)
+        if photo_response.status_code != 200:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото.")
+            return
+            
+        # Save photo to file
+        async with aiofiles.open(input_path, 'wb') as f:
+            await f.write(photo_response.content)
+        
+        # Process with ImageProcessor
+        from image_processor import ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.smart_crop(input_path, aspect_ratio, unique_id)
+        
+        # Send processed photo back to chat
         aspect_descriptions = {
             "1x1": "квадратный формат (1:1) для Instagram",
             "16x9": "широкий формат (16:9) для YouTube и презентаций", 
             "3x4": "портретный формат (3:4) для печати",
             "3x2": "классический формат (3:2) для фотографий"
         }
-        
         description = aspect_descriptions.get(aspect_ratio, f"формат {aspect_ratio}")
+        await send_telegram_photo(bot_token, chat_id, result_path, f"✅ *Обрезка выполнена!*\n\nПрименен {description}")
         
-        # Send demo result
-        await send_telegram_message(bot_token, chat_id, 
-            f"✅ *Обрезка выполнена!*\n\nПрименен {description}.\n\n🔗 Для получения реального результата используйте веб-версию:\nhttps://photo-master-pro-dddddd1997.replit.app", 
-            "Markdown")
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
             
         # Clear user state
         user_state.clear()
         
     except Exception as e:
         logger.error(f"Error in process_crop_with_aspect: {e}")
-        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обрезке.")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await send_telegram_message(bot_token, chat_id, f"❌ Произошла ошибка при обрезке: {str(e)}")
 
 async def process_custom_frame_upload(bot_token, chat_id, message, username, user_state):
     """Process custom frame upload"""
