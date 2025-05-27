@@ -674,6 +674,59 @@ class ImageProcessor:
             # Always try to find focal point first for all image types
             focal_x, focal_y = self._find_focal_point(img)
             
+            # Create debug visualization
+            debug_img = img.copy()
+            draw = ImageDraw.Draw(debug_img)
+            
+            # Draw focal point if found
+            if focal_x is not None and focal_y is not None:
+                # Draw red circle at focal point
+                radius = 20
+                draw.ellipse([focal_x - radius, focal_y - radius, focal_x + radius, focal_y + radius], 
+                           fill='red', outline='red')
+                logger.info(f"🎯 ОТЛАДКА: Фокусная точка найдена в ({focal_x}, {focal_y})")
+            else:
+                logger.info(f"❌ ОТЛАДКА: Фокусная точка не найдена")
+            
+            # Draw analysis grid (areas where we search for contrast)
+            for y in range(int(height * 0.2), int(height * 0.6), max(1, height // 20)):
+                for x in range(int(width * 0.2), int(width * 0.8), max(1, width // 20)):
+                    # Small blue dots for analysis points
+                    draw.ellipse([x-2, y-2, x+2, y+2], fill='blue', outline='blue')
+            
+            # Calculate crop position for visualization
+            if focal_x is not None and focal_y is not None:
+                desired_left = int(focal_x) - crop_width // 2
+                desired_top = int(focal_y) - crop_height // 2
+                left = max(safety_margin_x, min(desired_left, width - crop_width - safety_margin_x))
+                top = max(safety_margin_y, min(desired_top, height - crop_height - safety_margin_y))
+                left = max(0, min(left, width - crop_width))
+                top = max(0, min(top, height - crop_height))
+            else:
+                left = max(safety_margin_x, (width - crop_width) // 2)
+                top = max(safety_margin_y, (height - crop_height) // 2 - int(height * 0.1))
+                left = max(0, min(left, width - crop_width))
+                top = max(0, min(top, height - crop_height))
+            
+            # Draw crop area rectangle
+            right = left + crop_width
+            bottom = top + crop_height
+            draw.rectangle([left, top, right, bottom], outline='green', width=5)
+            
+            # Add text labels
+            try:
+                font = ImageFont.load_default()
+                draw.text((10, 10), f"Focal Point: ({focal_x}, {focal_y})", fill='white', font=font)
+                draw.text((10, 30), f"Crop Area: {left}, {top}, {right}, {bottom}", fill='white', font=font)
+                draw.text((10, 50), f"Crop Size: {crop_width}x{crop_height}", fill='white', font=font)
+            except:
+                pass
+            
+            # Save debug image
+            debug_path = f"processed/{file_id}_debug_analysis.png"
+            debug_img.save(debug_path, optimize=True, quality=95)
+            logger.info(f"🔍 ОТЛАДКА: Сохранена отладочная картинка: {debug_path}")
+            
             logger.info(f"🧠 ОТЛАДКА: Итоговый размер картинки: {crop_width}x{crop_height}")
             
             # Smart positioning logic with safety margins
