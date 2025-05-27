@@ -567,57 +567,30 @@ class ImageProcessor:
             raise
 
     async def add_custom_frame(self, image_path: str, frame_path: str, file_id: str) -> str:
-        """Add custom frame from uploaded file"""
+        """Add custom frame from uploaded file with exact size matching"""
         try:
-            # Open frame image to get its aspect ratio
+            # Open frame image to get its exact dimensions
             frame = Image.open(frame_path)
             frame = frame.convert("RGBA")
-            frame_ratio = frame.width / frame.height
+            frame_width, frame_height = frame.size
             
-            # Determine aspect ratio string for smart crop
-            if 0.95 <= frame_ratio <= 1.05:
-                aspect_ratio = "1:1"
-            elif 1.25 <= frame_ratio <= 1.4:
-                aspect_ratio = "4:3"
-            elif 0.71 <= frame_ratio <= 0.8:
-                aspect_ratio = "3:4"
-            elif 1.7 <= frame_ratio <= 1.8:
-                aspect_ratio = "16:9"
-            elif 0.55 <= frame_ratio <= 0.6:
-                aspect_ratio = "9:16"
-            elif 1.45 <= frame_ratio <= 1.55:
-                aspect_ratio = "3:2"
-            elif 0.65 <= frame_ratio <= 0.7:
-                aspect_ratio = "2:3"
-            else:
-                aspect_ratio = "1:1"  # Default to square
+            logger.info(f"🖼️ КАСТОМНАЯ РАМКА: Размер рамки {frame_width}x{frame_height}")
             
-            # Smart crop the image to match frame proportions
-            cropped_path = await self.smart_crop(image_path, aspect_ratio, file_id + "_temp")
+            # Load original image
+            img = Image.open(image_path)
+            img = img.convert("RGB")
             
-            # Open cropped image
-            img = Image.open(cropped_path)
-            img = img.convert("RGBA")
+            # Apply smart crop to match frame dimensions exactly
+            cropped_img = self._crop_to_exact_dimensions(img, frame_width, frame_height)
             
-            # Clean up temporary cropped file
-            import os
-            os.remove(cropped_path)
+            # Convert to RGBA for transparency support
+            cropped_img = cropped_img.convert("RGBA")
             
-            # Resize frame to fit image with some padding
-            padding = 100  # Extra space for frame
-            target_size = (img.width + padding * 2, img.height + padding * 2)
-            frame = frame.resize(target_size, Image.Resampling.LANCZOS)
+            logger.info(f"🖼️ КАСТОМНАЯ РАМКА: Фото обрезано до {cropped_img.width}x{cropped_img.height}")
             
-            # Create composite image
-            result = Image.new("RGBA", target_size, (255, 255, 255, 0))
-            
-            # Place original image in center
-            img_x = (target_size[0] - img.width) // 2
-            img_y = (target_size[1] - img.height) // 2
-            result.paste(img, (img_x, img_y), img)
-            
-            # Apply frame overlay
-            result = Image.alpha_composite(result, frame)
+            # Create final result by compositing frame over photo
+            result = cropped_img.copy()
+            result.paste(frame, (0, 0), frame)
             
             # Convert to RGB for saving
             final_result = Image.new("RGB", result.size, (255, 255, 255))
@@ -796,6 +769,38 @@ class ImageProcessor:
         except Exception as e:
             logger.error(f"Error in smart crop: {e}")
             raise
+
+    def _crop_to_exact_dimensions(self, img, target_width, target_height):
+        """Crop image to exact dimensions using smart focal point detection"""
+        try:
+            width, height = img.size
+            
+            # Find focal point for smart positioning
+            focal_x, focal_y = self._find_focal_point(img)
+            
+            if focal_x is None or focal_y is None:
+                # Fallback to center with upward bias
+                focal_x = width // 2
+                focal_y = height // 3  # Upper third for faces
+            
+            # Calculate crop position
+            left = max(0, min(int(focal_x) - target_width // 2, width - target_width))
+            top = max(0, min(int(focal_y) - target_height // 2, height - target_height))
+            
+            # Crop and resize to exact dimensions
+            cropped = img.crop((left, top, left + target_width, top + target_height))
+            
+            # If crop is smaller than target, resize to exact dimensions
+            if cropped.size != (target_width, target_height):
+                cropped = cropped.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            logger.info(f"🔧 ТОЧНАЯ ОБРЕЗКА: {width}x{height} → {target_width}x{target_height}, фокус ({focal_x}, {focal_y})")
+            
+            return cropped
+        except Exception as e:
+            logger.error(f"Error in exact crop: {e}")
+            # Fallback: simple center crop and resize
+            return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
     def _find_focal_point(self, img):
         """Find the most interesting point in the image - prioritize faces"""
