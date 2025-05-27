@@ -809,36 +809,75 @@ function showResults(result) {
     
     console.log('showResults received:', result);
     
-    // Поддержка как одного результата, так и массива результатов
-    const results = Array.isArray(result) ? result : [result];
-    
-    console.log('Processing results array:', results);
-    
     let imagesHTML = '';
     let downloadButtons = '';
     
-    results.forEach((res, index) => {
-        console.log(`Processing result ${index}:`, res);
+    // Handle social media optimization results
+    if (result.optimized_versions) {
+        console.log('Processing social media optimization results');
         
-        // Поддержка разных форматов ответа API
-        const outputPath = res.output_path || res.processed_path || (res.success && res.output_path);
+        imagesHTML = '<div class="row g-3">';
+        downloadButtons = '<div class="mb-3"><h5>Скачать по платформам:</h5></div>';
         
-        console.log(`Output path for result ${index}:`, outputPath);
-        
-        if (outputPath) {
+        Object.entries(result.optimized_versions).forEach(([platform, info]) => {
             imagesHTML += `
-                <div class="col-md-6 mb-3">
-                    <img src="${outputPath}" class="result-image w-100" alt="Обработанное изображение ${index + 1}">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                    <div class="card h-100">
+                        <img src="${info.path}" class="card-img-top result-image" alt="${info.name}" style="height: 150px; object-fit: cover;">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1" style="font-size: 0.85rem;">${info.name}</h6>
+                            <small class="text-muted d-block">${info.dimensions}</small>
+                            <small class="text-muted">${info.file_size}</small>
+                        </div>
+                    </div>
                 </div>
             `;
+            
             downloadButtons += `
-                <a href="${outputPath}" download class="btn btn-primary me-2 mb-2">
-                    <i class="fas fa-download me-2"></i>
-                    Скачать ${results.length > 1 ? `фото ${index + 1}` : 'результат'}
+                <a href="${info.path}" download class="btn btn-outline-primary btn-sm me-2 mb-2">
+                    <i class="fas fa-download me-1"></i>
+                    ${info.name}
                 </a>
             `;
-        }
-    });
+        });
+        
+        imagesHTML += '</div>';
+        downloadButtons += `
+            <div class="mt-3">
+                <small class="text-muted">Создано ${result.total_created} оптимизированных версий из оригинала ${result.original_dimensions}</small>
+            </div>
+        `;
+    }
+    // Handle regular results
+    else {
+        // Поддержка как одного результата, так и массива результатов
+        const results = Array.isArray(result) ? result : [result];
+        
+        console.log('Processing results array:', results);
+        
+        results.forEach((res, index) => {
+            console.log(`Processing result ${index}:`, res);
+            
+            // Поддержка разных форматов ответа API
+            const outputPath = res.output_path || res.processed_path || (res.success && res.output_path);
+            
+            console.log(`Output path for result ${index}:`, outputPath);
+            
+            if (outputPath) {
+                imagesHTML += `
+                    <div class="col-md-6 mb-3">
+                        <img src="${outputPath}" class="result-image w-100" alt="Обработанное изображение ${index + 1}">
+                    </div>
+                `;
+                downloadButtons += `
+                    <a href="${outputPath}" download class="btn btn-primary me-2 mb-2">
+                        <i class="fas fa-download me-2"></i>
+                        Скачать ${results.length > 1 ? `фото ${index + 1}` : 'результат'}
+                    </a>
+                `;
+            }
+        });
+    }
     
     console.log('Generated HTML:', { imagesHTML, downloadButtons });
     
