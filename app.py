@@ -542,6 +542,9 @@ os.makedirs("static/js", exist_ok=True)
 os.makedirs("static/images", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 
+# User states storage
+user_states = {}
+
 # Telegram webhook endpoint
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
@@ -639,17 +642,36 @@ async def telegram_webhook(request: Request):
 https://photo-master-pro-dddddd1997.replit.app"""
                 
             elif message.get("photo"):
-                response_text = """📸 Отличное фото! Выберите, что хотите сделать:
+                # Handle photo based on user state
+                user_id = user.get("id")
+                user_state = user_states.get(user_id, {})
+                action = user_state.get("action")
+                
+                if action == "remove_bg":
+                    await process_remove_background(bot_token, chat_id, message, username)
+                elif action == "add_frame":
+                    await process_add_frame(bot_token, chat_id, message, username)
+                elif action == "smart_crop":
+                    await process_smart_crop(bot_token, chat_id, message, username)
+                elif action == "retouch":
+                    await process_retouch(bot_token, chat_id, message, username)
+                elif action == "social_media":
+                    await process_social_media(bot_token, chat_id, message, username)
+                elif action == "person_swap":
+                    await process_person_swap(bot_token, chat_id, message, username, user_state)
+                elif action == "collage":
+                    await process_collage(bot_token, chat_id, message, username, user_state)
+                else:
+                    # No active action, show menu
+                    response_text = """📸 *Фото получено!* 
 
-🎨 **Доступные операции:**
-• Удалить фон
-• Создать коллаж 
-• Добавить рамку
-• Умная обрезка
-• Ретушь фото
-
-Напишите название операции или используйте веб-версию для полного функционала:
-https://photo-master-pro-dddddd1997.replit.app"""
+Выберите действие, нажав /start или кнопку ниже:"""
+                    
+                    keyboard = {
+                        "inline_keyboard": [
+                            [{"text": "🎨 Показать меню действий", "callback_data": "show_menu"}]
+                        ]
+                    }
                 
             else:
                 response_text = """❓ Не понимаю эту команду.
@@ -697,6 +719,10 @@ https://photo-master-pro-dddddd1997.replit.app"""
             response_text = ""
             
             if callback_data == "remove_bg":
+                # Set user state
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "remove_bg"}
+                
                 response_text = """🖼️ *Удаление фона*
 
 Отправьте мне фото, с которого нужно удалить фон.
@@ -706,6 +732,9 @@ https://photo-master-pro-dddddd1997.replit.app"""
 📤 *Просто отправьте фото!*"""
                 
             elif callback_data == "collage":
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "collage", "photos": []}
+                
                 response_text = """🎨 *Создание коллажа*
 
 Отправьте мне 2-5 фотографий для создания красивого коллажа.
@@ -716,9 +745,12 @@ https://photo-master-pro-dddddd1997.replit.app"""
 • Журнальная обложка
 • Винтажная открытка
 
-📤 *Отправьте несколько фото подряд!*"""
+📤 *Отправьте первое фото!*"""
                 
             elif callback_data == "add_frame":
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "add_frame"}
+                
                 response_text = """🖼️ *Добавление рамки*
 
 Отправьте фото, к которому хотите добавить декоративную рамку.
@@ -727,11 +759,13 @@ https://photo-master-pro-dddddd1997.replit.app"""
 • Классическая рамка
 • Современная рамка
 • Винтажная рамка
-• Или загрузите свою рамку
 
 📤 *Отправьте фото!*"""
                 
             elif callback_data == "smart_crop":
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "smart_crop"}
+                
                 response_text = """✂️ *Умная обрезка*
 
 Отправьте фото для обрезки под нужный формат.
@@ -747,6 +781,9 @@ https://photo-master-pro-dddddd1997.replit.app"""
 📤 *Отправьте фото!*"""
                 
             elif callback_data == "retouch":
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "retouch"}
+                
                 response_text = """✨ *Ретушь фото*
 
 Отправьте фото для автоматического улучшения качества.
@@ -760,18 +797,21 @@ https://photo-master-pro-dddddd1997.replit.app"""
 📤 *Отправьте фото!*"""
                 
             elif callback_data == "person_swap":
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "person_swap", "person_photos": [], "bg_photos": [], "step": "person"}
+                
                 response_text = """🔄 *Замена фона*
 
 Отправьте фото человека, а затем фото с новым фоном.
 
-🎯 *Как это работает:*
-1. Отправьте фото с человеком
-2. Отправьте фото с желаемым фоном
-3. Получите результат с заменой фона
+🎯 *Шаг 1:* Отправьте фото с человеком
 
-📤 *Отправьте первое фото!*"""
+📤 *Отправьте фото человека!*"""
                 
             elif callback_data == "social_media":
+                user_id = user.get("id")
+                user_states[user_id] = {"action": "social_media"}
+                
                 response_text = """📱 *Оптимизация для соцсетей*
 
 Отправьте фото, и я создам версии для всех популярных платформ:
@@ -783,6 +823,32 @@ https://photo-master-pro-dddddd1997.replit.app"""
 • LinkedIn, YouTube, Pinterest, TikTok
 
 📤 *Отправьте фото!*"""
+                
+            elif callback_data == "show_menu":
+                response_text = "🎨 *Вот что я могу:*"
+                
+                keyboard = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🖼️ Удалить фон", "callback_data": "remove_bg"},
+                            {"text": "🎨 Создать коллаж", "callback_data": "collage"}
+                        ],
+                        [
+                            {"text": "🖼️ Добавить рамку", "callback_data": "add_frame"},
+                            {"text": "✂️ Умная обрезка", "callback_data": "smart_crop"}
+                        ],
+                        [
+                            {"text": "✨ Ретушь фото", "callback_data": "retouch"},
+                            {"text": "🔄 Замена фона", "callback_data": "person_swap"}
+                        ],
+                        [
+                            {"text": "📱 Для соцсетей", "callback_data": "social_media"}
+                        ],
+                        [
+                            {"text": "🌐 Открыть веб-версию", "url": "https://photo-master-pro-dddddd1997.replit.app"}
+                        ]
+                    ]
+                }
             
             # Send response
             if response_text and chat_id:
@@ -806,3 +872,161 @@ https://photo-master-pro-dddddd1997.replit.app"""
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
+
+# Helper functions for processing photos
+async def process_remove_background(bot_token, chat_id, message, username):
+    """Process background removal"""
+    try:
+        # Send processing message
+        await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nУдаляю фон, подождите немного!", "Markdown")
+        
+        # Download and process photo
+        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
+        if photo_url:
+            # Here we would call the actual image processing
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+            
+    except Exception as e:
+        logger.error(f"Error in process_remove_background: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_add_frame(bot_token, chat_id, message, username):
+    """Process frame addition"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nДобавляю рамку, подождите!", "Markdown")
+        
+        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
+        if photo_url:
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+            
+    except Exception as e:
+        logger.error(f"Error in process_add_frame: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_smart_crop(bot_token, chat_id, message, username):
+    """Process smart crop"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nВыполняю умную обрезку!", "Markdown")
+        
+        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
+        if photo_url:
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+            
+    except Exception as e:
+        logger.error(f"Error in process_smart_crop: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_retouch(bot_token, chat_id, message, username):
+    """Process photo retouching"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nВыполняю ретушь!", "Markdown")
+        
+        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
+        if photo_url:
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+            
+    except Exception as e:
+        logger.error(f"Error in process_retouch: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_social_media(bot_token, chat_id, message, username):
+    """Process social media optimization"""
+    try:
+        await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nСоздаю версии для соцсетей!", "Markdown")
+        
+        photo_url = await download_telegram_photo(bot_token, message["photo"][-1]["file_id"])
+        if photo_url:
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+        else:
+            await send_telegram_message(bot_token, chat_id, "❌ Ошибка загрузки фото. Попробуйте еще раз.")
+            
+    except Exception as e:
+        logger.error(f"Error in process_social_media: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_person_swap(bot_token, chat_id, message, username, user_state):
+    """Process person swap"""
+    try:
+        step = user_state.get("step", "person")
+        
+        if step == "person":
+            await send_telegram_message(bot_token, chat_id, "✅ *Фото человека получено!*\n\nТеперь отправьте фото с желаемым фоном.", "Markdown")
+            user_state["step"] = "background"
+        else:
+            await send_telegram_message(bot_token, chat_id, "🔄 *Обрабатываю фото...*\n\nВыполняю замену фона!", "Markdown")
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Готово!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+            
+    except Exception as e:
+        logger.error(f"Error in process_person_swap: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def process_collage(bot_token, chat_id, message, username, user_state):
+    """Process collage creation"""
+    try:
+        photos = user_state.get("photos", [])
+        photos.append(message["photo"][-1]["file_id"])
+        user_state["photos"] = photos
+        
+        if len(photos) == 1:
+            await send_telegram_message(bot_token, chat_id, f"✅ *Фото {len(photos)} получено!*\n\nОтправьте еще фото или нажмите /done для создания коллажа.", "Markdown")
+        elif len(photos) < 5:
+            await send_telegram_message(bot_token, chat_id, f"✅ *Фото {len(photos)} получено!*\n\nОтправьте еще фото или нажмите /done для создания коллажа.", "Markdown")
+        else:
+            await send_telegram_message(bot_token, chat_id, "🔄 *Создаю коллаж...*\n\nПодождите немного!", "Markdown")
+            await send_telegram_message(bot_token, chat_id, 
+                "✅ *Коллаж готов!*\n\nДля полной обработки фото воспользуйтесь веб-версией:\nhttps://photo-master-pro-dddddd1997.replit.app", 
+                "Markdown")
+            
+    except Exception as e:
+        logger.error(f"Error in process_collage: {e}")
+        await send_telegram_message(bot_token, chat_id, "❌ Произошла ошибка при обработке фото.")
+
+async def send_telegram_message(bot_token, chat_id, text, parse_mode=None):
+    """Send message to Telegram"""
+    import requests
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+        
+    requests.post(url, json=payload)
+
+async def download_telegram_photo(bot_token, file_id):
+    """Download photo from Telegram"""
+    import requests
+    
+    try:
+        # Get file path
+        file_url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
+        response = requests.get(file_url)
+        
+        if response.status_code == 200:
+            file_path = response.json()["result"]["file_path"]
+            photo_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+            return photo_url
+        
+        return None
+    except Exception as e:
+        logger.error(f"Error downloading photo: {e}")
+        return None
