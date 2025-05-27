@@ -672,26 +672,9 @@ https://photo-master-pro-dddddd1997.replit.app"""
                     await process_collage(bot_token, chat_id, message, username, user_state)
                     return {"status": "ok"}
                 else:
-                    # No active action, show menu
-                    response_text = """📸 *Фото получено!* 
-
-Выберите действие, нажав /start или кнопку ниже:"""
-                    
-                    keyboard = {
-                        "inline_keyboard": [
-                            [{"text": "🎨 Показать меню действий", "callback_data": "show_menu"}]
-                        ]
-                    }
-                    
-                    # Send message with keyboard
-                    telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                    payload = {
-                        "chat_id": chat_id,
-                        "text": response_text,
-                        "parse_mode": "Markdown",
-                        "reply_markup": keyboard
-                    }
-                    response = requests.post(telegram_url, json=payload)
+                    # No active action, automatically process with background removal
+                    await send_telegram_message(bot_token, chat_id, "📸 *Фото получено!*\n\n🔄 Автоматически убираю фон...", "Markdown")
+                    await process_remove_background(bot_token, chat_id, message, username)
                     return {"status": "ok"}
                 
             else:
