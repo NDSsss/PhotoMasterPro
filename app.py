@@ -574,24 +574,48 @@ async def telegram_webhook(request: Request):
             response_text = ""
             
             if text == "/start":
-                response_text = """🎨 Добро пожаловать в PhotoProcessor Bot!
-
-Я помогу вам обработать ваши фотографии с помощью ИИ:
-
-📸 **Что я умею:**
-• Удалять фон с фотографий
-• Создавать коллажи и фотокарточки
-• Добавлять рамки
-• Умная обрезка под любой формат
-• Ретушь и улучшение качества
-• Замена фона на фотографиях
-
-📝 **Как пользоваться:**
-Просто отправьте мне фото, и я покажу все доступные варианты обработки!
-
-🔗 **Веб-версия:** https://photo-master-pro-dddddd1997.replit.app
-
-Отправьте любое фото для начала работы! 📷"""
+                response_text = "🎨 *Вот что я могу:*"
+                
+                # Create inline keyboard with action buttons
+                keyboard = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "🖼️ Удалить фон", "callback_data": "remove_bg"},
+                            {"text": "🎨 Создать коллаж", "callback_data": "collage"}
+                        ],
+                        [
+                            {"text": "🖼️ Добавить рамку", "callback_data": "add_frame"},
+                            {"text": "✂️ Умная обрезка", "callback_data": "smart_crop"}
+                        ],
+                        [
+                            {"text": "✨ Ретушь фото", "callback_data": "retouch"},
+                            {"text": "🔄 Замена фона", "callback_data": "person_swap"}
+                        ],
+                        [
+                            {"text": "📱 Для соцсетей", "callback_data": "social_media"}
+                        ],
+                        [
+                            {"text": "🌐 Открыть веб-версию", "url": "https://photo-master-pro-dddddd1997.replit.app"}
+                        ]
+                    ]
+                }
+                
+                # Send message with inline keyboard
+                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                payload = {
+                    "chat_id": chat_id,
+                    "text": response_text,
+                    "parse_mode": "Markdown",
+                    "reply_markup": keyboard
+                }
+                
+                response = requests.post(telegram_url, json=payload)
+                if response.status_code == 200:
+                    logger.info(f"Sent start message with buttons to {username}")
+                else:
+                    logger.error(f"Failed to send start message: {response.text}")
+                
+                return {"status": "ok"}
                 
             elif text == "/help":
                 response_text = """📋 **Помощь по PhotoProcessor Bot**
@@ -652,6 +676,128 @@ https://photo-master-pro-dddddd1997.replit.app"""
                     logger.info(f"Sent response to {username}")
                 else:
                     logger.error(f"Failed to send response: {response.text}")
+        
+        # Handle callback queries (button presses)
+        elif "callback_query" in update_data:
+            callback_query = update_data["callback_query"]
+            chat_id = callback_query.get("message", {}).get("chat", {}).get("id")
+            callback_data = callback_query.get("data", "")
+            query_id = callback_query.get("id")
+            user = callback_query.get("from", {})
+            username = user.get("username", "unknown")
+            
+            logger.info(f"Processing callback from {username}: {callback_data}")
+            
+            # Answer the callback query first
+            answer_url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
+            answer_payload = {"callback_query_id": query_id}
+            requests.post(answer_url, json=answer_payload)
+            
+            # Handle different callback actions
+            response_text = ""
+            
+            if callback_data == "remove_bg":
+                response_text = """🖼️ *Удаление фона*
+
+Отправьте мне фото, с которого нужно удалить фон.
+
+Я использую современные ИИ-модели для точного выделения объектов и создания прозрачного фона.
+
+📤 *Просто отправьте фото!*"""
+                
+            elif callback_data == "collage":
+                response_text = """🎨 *Создание коллажа*
+
+Отправьте мне 2-5 фотографий для создания красивого коллажа.
+
+📸 *Доступные стили:*
+• Полароид с подписью
+• Сетка фотографий  
+• Журнальная обложка
+• Винтажная открытка
+
+📤 *Отправьте несколько фото подряд!*"""
+                
+            elif callback_data == "add_frame":
+                response_text = """🖼️ *Добавление рамки*
+
+Отправьте фото, к которому хотите добавить декоративную рамку.
+
+🎨 *Доступные стили:*
+• Классическая рамка
+• Современная рамка
+• Винтажная рамка
+• Или загрузите свою рамку
+
+📤 *Отправьте фото!*"""
+                
+            elif callback_data == "smart_crop":
+                response_text = """✂️ *Умная обрезка*
+
+Отправьте фото для обрезки под нужный формат.
+
+📐 *Доступные форматы:*
+• Квадрат (1:1)
+• Прямоугольник (16:9)
+• Портрет (3:4)
+• И другие форматы
+
+🧠 ИИ автоматически найдет лучшую композицию!
+
+📤 *Отправьте фото!*"""
+                
+            elif callback_data == "retouch":
+                response_text = """✨ *Ретушь фото*
+
+Отправьте фото для автоматического улучшения качества.
+
+🔧 *Что будет улучшено:*
+• Яркость и контрастность
+• Четкость изображения
+• Цветовой баланс
+• Устранение шумов
+
+📤 *Отправьте фото!*"""
+                
+            elif callback_data == "person_swap":
+                response_text = """🔄 *Замена фона*
+
+Отправьте фото человека, а затем фото с новым фоном.
+
+🎯 *Как это работает:*
+1. Отправьте фото с человеком
+2. Отправьте фото с желаемым фоном
+3. Получите результат с заменой фона
+
+📤 *Отправьте первое фото!*"""
+                
+            elif callback_data == "social_media":
+                response_text = """📱 *Оптимизация для соцсетей*
+
+Отправьте фото, и я создам версии для всех популярных платформ:
+
+📱 *Создам форматы для:*
+• Instagram (пост и сторис)
+• Facebook (пост и обложка)
+• Twitter (пост и заголовок)
+• LinkedIn, YouTube, Pinterest, TikTok
+
+📤 *Отправьте фото!*"""
+            
+            # Send response
+            if response_text and chat_id:
+                telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                payload = {
+                    "chat_id": chat_id,
+                    "text": response_text,
+                    "parse_mode": "Markdown"
+                }
+                
+                response = requests.post(telegram_url, json=payload)
+                if response.status_code == 200:
+                    logger.info(f"Sent callback response to {username}")
+                else:
+                    logger.error(f"Failed to send callback response: {response.text}")
         
         return {"status": "ok"}
         
