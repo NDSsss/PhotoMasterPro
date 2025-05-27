@@ -635,85 +635,77 @@ class ImageProcessor:
             
             target_ratio = aspect_ratios.get(aspect_ratio, 1.0)
             
-            # Calculate crop dimensions based on target ratio with margin consideration
-            # Reserve space for margins (50% total - 25% on each side)
-            margin_factor = 0.5  # 50% total margin space
+            # Calculate crop dimensions - максимально возможный размер для заданного соотношения
+            logger.info(f"🔍 ОТЛАДКА: Оригинальное изображение: {width}x{height}")
+            logger.info(f"🎯 ОТЛАДКА: Выбранные пропорции: {aspect_ratio} (коэффициент {target_ratio})")
             
-            if target_ratio >= 1:  # Landscape or square
-                # For landscape crops, limit by height first, then calculate width
-                available_height = height * (1 - margin_factor)
-                available_width = width * (1 - margin_factor)
+            if target_ratio >= 1:  # Landscape or square (16:9, 4:3, 1:1)
+                # Для горизонтальных форматов ограничиваемся высотой
+                crop_height = height
+                crop_width = int(height * target_ratio)
                 
-                crop_height = min(available_height, available_width / target_ratio)
-                crop_width = int(crop_height * target_ratio)
-            else:  # Portrait
-                # For portrait crops, limit by width first, then calculate height
-                available_height = height * (1 - margin_factor)
-                available_width = width * (1 - margin_factor)
+                # Если ширина получается больше доступной, ограничиваемся шириной
+                if crop_width > width:
+                    crop_width = width
+                    crop_height = int(width / target_ratio)
+                    
+            else:  # Portrait (9:16, 3:4, 2:3)
+                # Для вертикальных форматов ограничиваемся шириной
+                crop_width = width
+                crop_height = int(width / target_ratio)
                 
-                crop_width = min(available_width, available_height * target_ratio)
-                crop_height = int(crop_width / target_ratio)
+                # Если высота получается больше доступной, ограничиваемся высотой
+                if crop_height > height:
+                    crop_height = height
+                    crop_width = int(height * target_ratio)
             
-            # Define safety margins (25% from edges for better face protection)
-            margin_x = int(crop_width * 0.25)
-            margin_y = int(crop_height * 0.25)
+            logger.info(f"📐 ОТЛАДКА: Размер обрезки: {crop_width}x{crop_height}")
             
-            logger.info(f"Image size: {width}x{height}, Crop size: {crop_width}x{crop_height}, Margins: {margin_x}x{margin_y}")
+            # Безопасные отступы - только для позиционирования, не для размера
+            safety_margin_x = int(min(100, (width - crop_width) * 0.1))  # 10% от доступного пространства или 100px
+            safety_margin_y = int(min(100, (height - crop_height) * 0.1))  # 10% от доступного пространства или 100px
+            
+            logger.info(f"🛡️ ОТЛАДКА: Безопасные отступы: {safety_margin_x}x{safety_margin_y}")
+            
+            pixels_to_crop_horizontal = width - crop_width
+            pixels_to_crop_vertical = height - crop_height
+            logger.info(f"✂️ ОТЛАДКА: Нужно обрезать пикселей - горизонтально: {pixels_to_crop_horizontal}, вертикально: {pixels_to_crop_vertical}")
             
             # Always try to find focal point first for all image types
             focal_x, focal_y = self._find_focal_point(img)
             
-            # Smart positioning logic with margins applied to ALL cases
+            logger.info(f"🧠 ОТЛАДКА: Итоговый размер картинки: {crop_width}x{crop_height}")
+            
+            # Smart positioning logic with safety margins
             if focal_x is not None and focal_y is not None:
-                # Center crop around focal point with safety margins
+                # Center crop around focal point
                 desired_left = int(focal_x) - crop_width // 2
                 desired_top = int(focal_y) - crop_height // 2
                 
-                # Apply safety margins - ensure we don't get too close to edges
-                # Left bound: must be at least margin_x from left edge
-                # Right bound: must be at least margin_x from right edge (width - crop_width - margin_x)
-                left = max(margin_x, min(desired_left, width - crop_width - margin_x))
-                top = max(margin_y, min(desired_top, height - crop_height - margin_y))
+                # Apply safety margins to keep face away from edges
+                left = max(safety_margin_x, min(desired_left, width - crop_width - safety_margin_x))
+                top = max(safety_margin_y, min(desired_top, height - crop_height - safety_margin_y))
                 
-                # Additional safety - if margins push us beyond image bounds, center with available space
-                if left < 0:
-                    left = max(0, (width - crop_width) // 2)
-                if top < 0:
-                    top = max(0, (height - crop_height) // 2)
-                if left + crop_width > width:
-                    left = width - crop_width
-                if top + crop_height > height:
-                    top = height - crop_height
-                
-                logger.info(f"Focal point at ({focal_x}, {focal_y}), desired pos ({desired_left}, {desired_top}), final with margins at ({left}, {top}), margins=({margin_x}, {margin_y})")
-            
-            # Fallback positioning with margins based on image orientation
-            else:
-                # For portraits (tall images), bias towards upper portion to avoid cutting heads
-                if height > width * 1.2:  # Portrait orientation
-                    # Position crop towards upper part of image with margins
-                    if target_ratio > 1:  # Making it landscape - focus on upper 40%
-                        top = max(margin_y, int(height * 0.1))
-                    else:  # Keeping portrait - center with slight upward bias
-                        top = max(margin_y, (height - crop_height) // 2 - int(height * 0.1))
-                    left = max(margin_x, (width - crop_width) // 2)
-                    logger.info(f"Portrait fallback with margins: top={top}, left={left}")
-                
-                # For landscapes, center with margins
-                elif width > height * 1.5:  # Landscape orientation
-                    top = max(margin_y, (height - crop_height) // 2)
-                    left = max(margin_x, (width - crop_width) // 2)
-                    logger.info(f"Landscape fallback with margins: top={top}, left={left}")
-                
-                # For square-ish images, center with upward bias and margins
-                else:
-                    left = max(margin_x, (width - crop_width) // 2)
-                    top = max(margin_y, (height - crop_height) // 2 - int(height * 0.1))
-                    logger.info(f"Square fallback with margins: top={top}, left={left}")
-                
-                # Final boundary check for fallback positioning
+                # Final boundary check
                 left = max(0, min(left, width - crop_width))
                 top = max(0, min(top, height - crop_height))
+                
+                logger.info(f"🎯 ОТЛАДКА: Фокусная точка найдена в ({focal_x}, {focal_y})")
+                logger.info(f"📍 ОТЛАДКА: Желаемая позиция рамки: ({desired_left}, {desired_top})")
+                logger.info(f"🛡️ ОТЛАДКА: Финальная позиция с отступами: ({left}, {top})")
+            
+            # Fallback positioning if no focal point found
+            else:
+                # Center positioning with slight upward bias for faces
+                left = max(safety_margin_x, (width - crop_width) // 2)
+                top = max(safety_margin_y, (height - crop_height) // 2 - int(height * 0.1))
+                
+                # Final boundary check
+                left = max(0, min(left, width - crop_width))
+                top = max(0, min(top, height - crop_height))
+                
+                logger.info(f"❌ ОТЛАДКА: Фокусная точка не найдена, используется центральное позиционирование")
+                logger.info(f"📍 ОТЛАДКА: Позиция рамки: ({left}, {top})")
             
             right = left + crop_width
             bottom = top + crop_height
