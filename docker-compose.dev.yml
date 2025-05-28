@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: photoprocessor_db_dev
+    environment:
+      POSTGRES_DB: photoprocessor
+      POSTGRES_USER: photoprocessor
+      POSTGRES_PASSWORD: photoprocessor_password
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U photoprocessor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PhotoProcessor Application - Development Mode
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: photoprocessor_app_dev
+    environment:
+      - DATABASE_URL=postgresql://photoprocessor:photoprocessor_password@postgres:5432/photoprocessor
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - SESSION_SECRET=dev-session-secret-key
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - DEBUG=true
+      - PYTHONPATH=/app
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for live reload
+      - .:/app
+      # Exclude these directories from mounting (use container versions)
+      - /app/__pycache__
+      - /app/.git
+      # Mount data directories
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # Use development command with auto-reload
+    command: uvicorn app:app --host 0.0.0.0 --port 5000 --reload
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data_dev:
