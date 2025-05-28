@@ -1,8 +1,10 @@
 import os
 import uuid
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import List, Optional
+from contextlib import contextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -20,9 +22,28 @@ from models import User, ProcessedImage, get_db, init_db
 # Telegram bot временно отключен для отладки
 # from telegram_bot import TelegramBot
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure detailed logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s:%(lineno)d] - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
+# Create a performance logger
+perf_logger = logging.getLogger("performance")
+perf_logger.setLevel(logging.INFO)
+
+# Helper function for timing operations
+@contextmanager
+def timer(operation_name: str, request_id: str = None):
+    start_time = time.time()
+    request_prefix = f"[{request_id}] " if request_id else ""
+    logger.info(f"{request_prefix}🚀 STARTING: {operation_name}")
+    try:
+        yield
+    finally:
+        duration = time.time() - start_time
+        logger.info(f"{request_prefix}✅ COMPLETED: {operation_name} - Duration: {duration:.2f}s")
 
 app = FastAPI(title="Photo Processor API", description="Automatic photo processing service")
 
@@ -553,33 +574,50 @@ async def api_remove_background(
     user: User = Depends(get_current_user_optional)
 ):
     """API endpoint for background removal"""
+    file_id = str(uuid.uuid4())
+    
+    logger.info(f"[{file_id}] 📨 INCOMING REQUEST: /api/remove-background")
+    logger.info(f"[{file_id}] 📄 File: {file.filename}, Size: {file.size if hasattr(file, 'size') else 'unknown'}, Method: {method}")
+    logger.info(f"[{file_id}] 👤 User: {'authenticated' if user else 'anonymous'}")
+    
     try:
-        # Generate unique file ID
-        file_id = str(uuid.uuid4())
+        with timer("File upload and save", file_id):
+            # Save uploaded file
+            input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
+            os.makedirs("uploads", exist_ok=True)
+            
+            with open(input_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            
+            logger.info(f"[{file_id}] 💾 File saved to: {input_path}")
         
-        # Save uploaded file
-        input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
-        os.makedirs("uploads", exist_ok=True)
+        with timer("Background removal processing", file_id):
+            # Process with ImageProcessor
+            processor = ImageProcessor()
+            result_path = await processor.remove_background(input_path, file_id, method)
+            logger.info(f"[{file_id}] 🎨 Processing complete! Result: {result_path}")
         
-        with open(input_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        with timer("Database save", file_id):
+            # Save to database if user is authenticated
+            if user:
+                db = next(get_db())
+                processed_image = ProcessedImage(
+                    user_id=user.id,
+                    original_filename=file.filename,
+                    processed_filename=os.path.basename(result_path),
+                    processing_type=f"remove_background_{method}"
+                )
+                db.add(processed_image)
+                db.commit()
+                logger.info(f"[{file_id}] 💾 Saved to database for user {user.username}")
+            else:
+                logger.info(f"[{file_id}] 👤 Anonymous user - not saving to database")
         
-        # Process with ImageProcessor
-        processor = ImageProcessor()
-        result_path = await processor.remove_background(input_path, file_id, method)
-        
-        # Save to database if user is authenticated
-        if user:
-            db = next(get_db())
-            processed_image = ProcessedImage(
-                user_id=user.id,
-                original_filename=file.filename,
-                processed_filename=os.path.basename(result_path),
-                processing_type=f"remove_background_{method}"
-            )
-            db.add(processed_image)
-            db.commit()
+        # Generate result URL
+        result_url = f"http://localhost:5000/processed/{os.path.basename(result_path)}"
+        logger.info(f"[{file_id}] 🔗 RESULT URL: {result_url}")
+        logger.info(f"[{file_id}] ✅ REQUEST COMPLETED SUCCESSFULLY!")
         
         # Return file
         return FileResponse(
@@ -590,7 +628,7 @@ async def api_remove_background(
         )
         
     except Exception as e:
-        logger.error(f"API Error in remove_background: {e}")
+        logger.error(f"[{file_id}] ❌ ERROR in background removal: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         # Clean up input file
