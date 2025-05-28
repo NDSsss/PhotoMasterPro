@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: photoprocessor_db
+    environment:
+      POSTGRES_DB: photoprocessor
+      POSTGRES_USER: photoprocessor
+      POSTGRES_PASSWORD: photoprocessor_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U photoprocessor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PhotoProcessor Application
+  app:
+    build: .
+    container_name: photoprocessor_app
+    environment:
+      - DATABASE_URL=postgresql://photoprocessor:photoprocessor_password@postgres:5432/photoprocessor
+      - SECRET_KEY=your-super-secret-key-change-in-production
+      - SESSION_SECRET=your-session-secret-key
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
