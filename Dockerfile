@@ -1,5 +1,5 @@
 # PhotoProcessor Docker Image
-FROM python:3.11-slim
+FROM python:3.11
 
 # Set working directory
 WORKDIR /app
@@ -8,17 +8,17 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    libgtk-3-0 \
-    libglib2.0-0 \
-    libfontconfig1 \
-    libgstreamer1.0-0 \
-    libgstreamer-plugins-base1.0-0 \
-    libopencv-dev \
+#   libglib2.0-0 \
+#   libsm6 \
+#   libxext6 \
+#   libxrender-dev \
+#   libgomp1 \
+#   libgtk-3-0 \
+#   libglib2.0-0 \
+#   libfontconfig1 \
+#   libgstreamer1.0-0 \
+#   libgstreamer-plugins-base1.0-0 \
+#   libopencv-dev \
     python3-opencv \
     wget \
     curl \
