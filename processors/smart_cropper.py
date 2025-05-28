@@ -31,7 +31,12 @@ class SmartCropper:
         """Load OpenCV face detection cascade"""
         if self.face_cascade is None:
             try:
-                self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                # Try to load face detection cascade
+                cascade_path = '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml'
+                if not os.path.exists(cascade_path):
+                    # Fallback path
+                    cascade_path = 'haarcascade_frontalface_default.xml'
+                self.face_cascade = cv2.CascadeClassifier(cascade_path)
             except Exception as e:
                 logger.warning(f"Could not load face cascade: {e}")
                 self.face_cascade = None
