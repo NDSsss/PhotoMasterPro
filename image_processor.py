@@ -1,10 +1,31 @@
 import os
 import asyncio
+import time
+from contextlib import contextmanager
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 import cv2
 import numpy as np
 import logging
 import io
+
+# Configure detailed logging for image processing
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Helper function for timing operations in image processing
+@contextmanager
+def timer_step(step_name: str, file_id: str = None):
+    start_time = time.time()
+    request_prefix = f"[{file_id}] " if file_id else ""
+    logger.info(f"{request_prefix}🔧 STEP START: {step_name}")
+    try:
+        yield
+    finally:
+        duration = time.time() - start_time
+        logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 # Lazy import для rembg чтобы не блокировать запуск
 rembg_remove = None
@@ -47,6 +68,9 @@ class ImageProcessor:
         
     async def remove_background(self, input_path: str, file_id: str, method: str = "rembg") -> str:
         """Remove background from image using specified method"""
+        logger.info(f"[{file_id}] 🎨 Starting background removal with method: {method}")
+        logger.info(f"[{file_id}] 📁 Input file: {input_path}")
+        
         try:
             if method == "rembg":
                 return await self._remove_background_rembg(input_path, file_id)
@@ -56,30 +80,42 @@ class ImageProcessor:
                 raise ValueError(f"Unknown background removal method: {method}")
                 
         except Exception as e:
-            logger.error(f"Error removing background with method {method}: {e}")
+            logger.error(f"[{file_id}] ❌ Error removing background with method {method}: {e}")
             raise
 
     async def _remove_background_rembg(self, input_path: str, file_id: str) -> str:
         """Remove background using rembg library"""
+        logger.info(f"[{file_id}] 🔧 Using rembg method for background removal")
+        
         try:
-            # Read input image
-            with open(input_path, 'rb') as f:
-                input_data = f.read()
+            with timer_step("Reading input image", file_id):
+                # Read input image
+                with open(input_path, 'rb') as f:
+                    input_data = f.read()
+                logger.info(f"[{file_id}] 📖 Read {len(input_data)} bytes from input file")
             
-            # Get rembg function and remove background
-            remove_func = get_rembg()
-            output_data = remove_func(input_data)
+            with timer_step("Loading rembg library", file_id):
+                # Get rembg function and remove background
+                remove_func = get_rembg()
+                logger.info(f"[{file_id}] ✅ rembg library loaded successfully")
             
-            # Save output
-            output_path = f"processed/{file_id}_no_bg.png"
-            with open(output_path, 'wb') as f:
-                f.write(output_data)
+            with timer_step("AI background removal processing", file_id):
+                output_data = remove_func(input_data)
+                logger.info(f"[{file_id}] 🤖 AI processing complete, output size: {len(output_data)} bytes")
             
-            logger.info(f"Background removed successfully with rembg: {output_path}")
+            with timer_step("Saving result", file_id):
+                # Save output
+                output_path = f"processed/{file_id}_no_bg.png"
+                os.makedirs("processed", exist_ok=True)
+                with open(output_path, 'wb') as f:
+                    f.write(output_data)
+                logger.info(f"[{file_id}] 💾 Result saved to: {output_path}")
+            
+            logger.info(f"[{file_id}] ✅ Background removed successfully with rembg: {output_path}")
             return output_path
             
         except Exception as e:
-            logger.error(f"Error removing background with rembg: {e}")
+            logger.error(f"[{file_id}] ❌ Error removing background with rembg: {e}")
             raise
 
     async def _remove_background_lbm(self, input_path: str, file_id: str) -> str:

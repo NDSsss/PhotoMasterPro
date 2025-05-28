@@ -47,6 +47,20 @@ def timer(operation_name: str, request_id: str = None):
 
 app = FastAPI(title="Photo Processor API", description="Automatic photo processing service")
 
+# Add middleware for logging all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info(f"🌐 INCOMING HTTP REQUEST: {request.method} {request.url}")
+    logger.info(f"📋 Headers: {dict(request.headers)}")
+    
+    response = await call_next(request)
+    
+    duration = time.time() - start_time
+    logger.info(f"📤 HTTP RESPONSE: {response.status_code} - Duration: {duration:.2f}s")
+    
+    return response
+
 # Security
 security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
