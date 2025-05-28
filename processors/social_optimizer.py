@@ -20,9 +20,16 @@ def timer_step(step_name: str, file_id: str = None):
         logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 class SocialOptimizer:
-    """Класс для оптимизации изображений под социальные сети"""
+    """
+    Professional social media image optimization system for all major platforms.
+    
+    Automatically creates platform-specific optimized versions of images with correct
+    dimensions, aspect ratios, file sizes, and quality settings for Instagram, Facebook,
+    Twitter, LinkedIn, YouTube, and TikTok. Ensures maximum engagement and quality.
+    """
     
     def __init__(self):
+        """Initialize SocialOptimizer with platform specifications and quality settings."""
         self.platform_specs = {
             'instagram': {'size': (1080, 1080), 'quality': 85, 'format': 'JPEG'},
             'facebook': {'size': (1200, 630), 'quality': 85, 'format': 'JPEG'},
@@ -33,7 +40,28 @@ class SocialOptimizer:
         }
         
     async def optimize_for_social_media(self, image_path: str, file_id: str) -> dict:
-        """One-click social media optimization - creates optimized versions for all major platforms"""
+        """
+        Create optimized versions of image for all major social media platforms.
+        
+        One-click optimization that generates platform-specific versions with correct
+        dimensions, aspect ratios, compression, and quality settings. Maximizes visual
+        impact while ensuring fast loading and compliance with platform requirements.
+        
+        Args:
+            image_path (str): Path to input image file
+            file_id (str): Unique identifier for tracking and logging
+            
+        Returns:
+            dict: Platform-specific optimization results with paths, sizes, and metrics
+            
+        Raises:
+            Exception: If image processing or platform optimization fails
+            
+        Example:
+            optimizer = SocialOptimizer()
+            results = await optimizer.optimize_for_social_media("photo.jpg", "uuid")
+            # Returns: {"instagram": {"path": "...", "size": (1080, 1080)}, ...}
+        """
         logger.info(f"[{file_id}] 📱 Starting social media optimization")
         
         try:

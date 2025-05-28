@@ -22,13 +22,42 @@ def timer_step(step_name: str, file_id: str = None):
         logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 class FrameAdder:
-    """Класс для добавления рамок к изображениям"""
+    """
+    Professional frame addition system for images with multiple style options.
+    
+    Adds decorative frames to images using predefined styles or custom uploaded
+    frames. Automatically handles sizing, composition, and maintains image quality
+    while applying various frame effects including classic, modern, vintage styles.
+    """
     
     def __init__(self):
+        """Initialize FrameAdder with default settings."""
         pass
         
     async def add_frame(self, image_path: str, frame_style: str, file_id: str) -> str:
-        """Add decorative frame to image with smart cropping"""
+        """
+        Add decorative frame to image with automatic sizing and composition.
+        
+        Applies professional-quality frames to images with smart resizing and
+        positioning. Supports multiple predefined styles and maintains aspect
+        ratios while optimizing visual appeal and composition.
+        
+        Args:
+            image_path (str): Path to input image file
+            frame_style (str): Frame style ("classic", "modern", "vintage", etc.)
+            file_id (str): Unique identifier for tracking and logging
+            
+        Returns:
+            str: Path to framed image with optimized quality
+            
+        Raises:
+            ValueError: If frame style is not supported
+            Exception: If image processing or frame application fails
+            
+        Example:
+            frame_adder = FrameAdder()
+            result = await frame_adder.add_frame("photo.jpg", "classic", "uuid")
+        """
         logger.info(f"[{file_id}] 🖼️ Adding frame with style: {frame_style}")
         
         try:

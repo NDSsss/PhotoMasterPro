@@ -50,7 +50,29 @@ class SmartCropper:
         return self.face_cascade
         
     async def smart_crop(self, image_path: str, aspect_ratio: str, file_id: str) -> str:
-        """Smart crop image to desired aspect ratio with intelligent focus"""
+        """
+        Intelligently crop image to target aspect ratio preserving important content.
+        
+        Analyzes image for faces and applies smart cropping algorithms to maintain
+        visual focus while achieving desired dimensions. Includes 15% safety margin
+        from edges and optimizes composition automatically.
+        
+        Args:
+            image_path (str): Path to input image file
+            aspect_ratio (str): Target ratio like "1:1", "16:9", "4:3"
+            file_id (str): Unique identifier for tracking and logging
+            
+        Returns:
+            str: Path to intelligently cropped image
+            
+        Raises:
+            ValueError: If aspect ratio format is invalid
+            Exception: If image processing or face detection fails
+            
+        Example:
+            cropper = SmartCropper()
+            result = await cropper.smart_crop("photo.jpg", "1:1", "uuid")
+        """
         logger.info(f"[{file_id}] ✂️ Starting smart crop with aspect ratio: {aspect_ratio}")
         
         try:

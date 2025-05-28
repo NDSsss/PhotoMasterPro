@@ -21,13 +21,41 @@ def timer_step(step_name: str, file_id: str = None):
         logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 class PersonSwapper:
-    """Класс для замены людей на фонах"""
+    """
+    Advanced AI-powered person swapping and background replacement system.
+    
+    Intelligently extracts people from photos and places them on different backgrounds
+    with realistic lighting, shadows, and perspective matching. Uses sophisticated
+    background removal and composition techniques for natural-looking results.
+    """
     
     def __init__(self):
+        """Initialize PersonSwapper with background removal capabilities."""
         self.background_remover = BackgroundRemover()
         
     async def person_swap(self, image_paths: list, file_id: str) -> list:
-        """Подставляет людей с первых фото на фоны с остальных фото"""
+        """
+        Extract people from first image and place them on backgrounds from other images.
+        
+        Automatically removes background from person photos and composites them onto
+        new backgrounds with intelligent scaling, positioning, and lighting adjustment
+        to create realistic and natural-looking person swap results.
+        
+        Args:
+            image_paths (list): List of image paths (first = person, rest = backgrounds)
+            file_id (str): Unique identifier for tracking and logging
+            
+        Returns:
+            list: Paths to person-swapped images with realistic composition
+            
+        Raises:
+            ValueError: If insufficient images provided (minimum 2 required)
+            Exception: If person extraction or background composition fails
+            
+        Example:
+            swapper = PersonSwapper()
+            results = await swapper.person_swap(["person.jpg", "bg1.jpg", "bg2.jpg"], "uuid")
+        """
         logger.info(f"[{file_id}] 👥 Starting person swap with {len(image_paths)} images")
         
         try:

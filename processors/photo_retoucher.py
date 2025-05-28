@@ -22,13 +22,40 @@ def timer_step(step_name: str, file_id: str = None):
         logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 class PhotoRetoucher:
-    """Класс для автоматической ретуши фотографий"""
+    """
+    Professional automatic photo retouching system with AI-enhanced filters.
+    
+    Applies intelligent photo enhancements including brightness adjustment, contrast
+    optimization, color correction, sharpening, and noise reduction. Uses advanced
+    algorithms to automatically improve photo quality while maintaining natural look.
+    """
     
     def __init__(self):
+        """Initialize PhotoRetoucher with enhancement filters and settings."""
         pass
         
     async def retouch_image(self, image_path: str, file_id: str) -> str:
-        """Perform automatic retouching"""
+        """
+        Apply professional automatic retouching to enhance photo quality.
+        
+        Intelligently enhances photos using multiple filters and adjustments including
+        brightness, contrast, color balance, sharpening, and noise reduction. Maintains
+        natural appearance while significantly improving overall image quality.
+        
+        Args:
+            image_path (str): Path to input image file
+            file_id (str): Unique identifier for tracking and logging
+            
+        Returns:
+            str: Path to professionally retouched image
+            
+        Raises:
+            Exception: If image processing or enhancement filters fail
+            
+        Example:
+            retoucher = PhotoRetoucher()
+            result = await retoucher.retouch_image("photo.jpg", "uuid")
+        """
         logger.info(f"[{file_id}] ✨ Starting automatic photo retouching")
         
         try:

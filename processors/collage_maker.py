@@ -21,13 +21,43 @@ def timer_step(step_name: str, file_id: str = None):
         logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 class CollageMaker:
-    """Класс для создания коллажей и фотокарточек"""
+    """
+    Advanced collage creation system with multiple layout templates and styles.
+    
+    Creates professional photo collages, cards, and layouts using various templates
+    including polaroid, magazine covers, grid layouts, filmstrip effects, and vintage
+    postcards. Automatically handles image composition, text placement, and branding.
+    """
     
     def __init__(self):
+        """Initialize CollageMaker with logo and template settings."""
         self.logo_path = "static/images/logo.svg"
         
     async def create_collage(self, image_paths: list, collage_type: str, caption: str, file_id: str) -> str:
-        """Create photo collage based on type"""
+        """
+        Create professional photo collage with specified template and styling.
+        
+        Generates collages using various templates and layouts with automatic image
+        positioning, text placement, and brand integration. Supports multiple styles
+        from simple grids to complex magazine-style layouts with captions.
+        
+        Args:
+            image_paths (list): List of paths to input images
+            collage_type (str): Template type ("polaroid", "5x15", "5x5", "magazine", etc.)
+            caption (str): Text caption to include in collage
+            file_id (str): Unique identifier for tracking and logging
+            
+        Returns:
+            str: Path to created collage with optimized quality
+            
+        Raises:
+            ValueError: If collage type is not supported or insufficient images
+            Exception: If image processing or layout creation fails
+            
+        Example:
+            collage_maker = CollageMaker()
+            result = await collage_maker.create_collage(["1.jpg", "2.jpg"], "polaroid", "My Trip", "uuid")
+        """
         logger.info(f"[{file_id}] 🎨 Creating {collage_type} collage with {len(image_paths)} images")
         
         try:
