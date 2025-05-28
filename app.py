@@ -545,6 +545,478 @@ os.makedirs("templates", exist_ok=True)
 # User states storage
 user_states = {}
 
+# REST API Endpoints for Image Processing
+@app.post("/api/remove-background")
+async def api_remove_background(
+    file: UploadFile = File(...),
+    method: str = Form("rembg"),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for background removal"""
+    try:
+        # Generate unique file ID
+        file_id = str(uuid.uuid4())
+        
+        # Save uploaded file
+        input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
+        os.makedirs("uploads", exist_ok=True)
+        
+        with open(input_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.remove_background(input_path, file_id, method)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            processed_image = ProcessedImage(
+                user_id=user.id,
+                original_filename=file.filename,
+                processed_filename=os.path.basename(result_path),
+                processing_type=f"remove_background_{method}"
+            )
+            db.add(processed_image)
+            db.commit()
+        
+        # Return file
+        return FileResponse(
+            result_path,
+            media_type="image/png",
+            filename=f"no_bg_{file.filename}",
+            headers={"Content-Disposition": "attachment"}
+        )
+        
+    except Exception as e:
+        logger.error(f"API Error in remove_background: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
+
+@app.post("/api/add-frame")
+async def api_add_frame(
+    file: UploadFile = File(...),
+    frame_style: str = Form("classic"),
+    frame_file: UploadFile = File(None),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for adding frames"""
+    try:
+        file_id = str(uuid.uuid4())
+        
+        # Save uploaded file
+        input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
+        os.makedirs("uploads", exist_ok=True)
+        
+        with open(input_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        
+        if frame_file and frame_file.filename:
+            # Custom frame
+            frame_path = f"uploads/{file_id}_frame{os.path.splitext(frame_file.filename)[1]}"
+            with open(frame_path, "wb") as buffer:
+                frame_content = await frame_file.read()
+                buffer.write(frame_content)
+            result_path = await processor.add_custom_frame(input_path, frame_path, file_id)
+        else:
+            # Preset frame
+            result_path = await processor.add_frame(input_path, frame_style, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            processed_image = ProcessedImage(
+                user_id=user.id,
+                original_filename=file.filename,
+                processed_filename=os.path.basename(result_path),
+                processing_type=f"add_frame_{frame_style}"
+            )
+            db.add(processed_image)
+            db.commit()
+        
+        return FileResponse(
+            result_path,
+            media_type="image/jpeg",
+            filename=f"framed_{file.filename}",
+            headers={"Content-Disposition": "attachment"}
+        )
+        
+    except Exception as e:
+        logger.error(f"API Error in add_frame: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input files
+        try:
+            os.remove(input_path)
+            if 'frame_path' in locals():
+                os.remove(frame_path)
+        except:
+            pass
+
+@app.post("/api/smart-crop")
+async def api_smart_crop(
+    file: UploadFile = File(...),
+    aspect_ratio: str = Form("1:1"),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for smart cropping"""
+    try:
+        file_id = str(uuid.uuid4())
+        
+        # Save uploaded file
+        input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
+        os.makedirs("uploads", exist_ok=True)
+        
+        with open(input_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.smart_crop(input_path, aspect_ratio, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            processed_image = ProcessedImage(
+                user_id=user.id,
+                original_filename=file.filename,
+                processed_filename=os.path.basename(result_path),
+                processing_type=f"smart_crop_{aspect_ratio.replace(':', 'x')}"
+            )
+            db.add(processed_image)
+            db.commit()
+        
+        return FileResponse(
+            result_path,
+            media_type="image/jpeg",
+            filename=f"cropped_{aspect_ratio.replace(':', 'x')}_{file.filename}",
+            headers={"Content-Disposition": "attachment"}
+        )
+        
+    except Exception as e:
+        logger.error(f"API Error in smart_crop: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
+
+@app.post("/api/retouch")
+async def api_retouch(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for photo retouching"""
+    try:
+        file_id = str(uuid.uuid4())
+        
+        # Save uploaded file
+        input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
+        os.makedirs("uploads", exist_ok=True)
+        
+        with open(input_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.retouch_image(input_path, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            processed_image = ProcessedImage(
+                user_id=user.id,
+                original_filename=file.filename,
+                processed_filename=os.path.basename(result_path),
+                processing_type="retouch"
+            )
+            db.add(processed_image)
+            db.commit()
+        
+        return FileResponse(
+            result_path,
+            media_type="image/jpeg",
+            filename=f"retouched_{file.filename}",
+            headers={"Content-Disposition": "attachment"}
+        )
+        
+    except Exception as e:
+        logger.error(f"API Error in retouch: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
+
+@app.post("/api/social-media-optimize")
+async def api_social_media_optimize(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for social media optimization"""
+    try:
+        file_id = str(uuid.uuid4())
+        
+        # Save uploaded file
+        input_path = f"uploads/{file_id}_input{os.path.splitext(file.filename)[1]}"
+        os.makedirs("uploads", exist_ok=True)
+        
+        with open(input_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        result_data = await processor.optimize_for_social_media(input_path, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            for version in result_data.get("versions", []):
+                processed_image = ProcessedImage(
+                    user_id=user.id,
+                    original_filename=file.filename,
+                    processed_filename=os.path.basename(version["path"]),
+                    processing_type=f"social_media_{version['platform']}"
+                )
+                db.add(processed_image)
+            db.commit()
+        
+        # Return JSON with download links
+        return {"message": "Optimization complete", "versions": result_data.get("versions", [])}
+        
+    except Exception as e:
+        logger.error(f"API Error in social_media_optimize: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input file
+        try:
+            os.remove(input_path)
+        except:
+            pass
+
+@app.post("/api/create-collage")
+async def api_create_collage(
+    files: List[UploadFile] = File(...),
+    collage_type: str = Form("polaroid"),
+    caption: str = Form(""),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for creating collages"""
+    try:
+        file_id = str(uuid.uuid4())
+        input_paths = []
+        
+        # Save uploaded files
+        os.makedirs("uploads", exist_ok=True)
+        for i, file in enumerate(files):
+            input_path = f"uploads/{file_id}_input_{i}{os.path.splitext(file.filename)[1]}"
+            with open(input_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            input_paths.append(input_path)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        result_path = await processor.create_collage(input_paths, collage_type, caption, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            processed_image = ProcessedImage(
+                user_id=user.id,
+                original_filename=f"collage_{len(files)}_photos.jpg",
+                processed_filename=os.path.basename(result_path),
+                processing_type=f"collage_{collage_type}"
+            )
+            db.add(processed_image)
+            db.commit()
+        
+        return FileResponse(
+            result_path,
+            media_type="image/jpeg",
+            filename=f"collage_{collage_type}.jpg",
+            headers={"Content-Disposition": "attachment"}
+        )
+        
+    except Exception as e:
+        logger.error(f"API Error in create_collage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input files
+        for path in input_paths:
+            try:
+                os.remove(path)
+            except:
+                pass
+
+@app.post("/api/person-swap")
+async def api_person_swap(
+    person_files: List[UploadFile] = File(...),
+    background_files: List[UploadFile] = File(...),
+    user: User = Depends(get_current_user_optional)
+):
+    """API endpoint for person swapping"""
+    try:
+        file_id = str(uuid.uuid4())
+        person_paths = []
+        background_paths = []
+        
+        # Save uploaded files
+        os.makedirs("uploads", exist_ok=True)
+        
+        # Save person files
+        for i, file in enumerate(person_files):
+            input_path = f"uploads/{file_id}_person_{i}{os.path.splitext(file.filename)[1]}"
+            with open(input_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            person_paths.append(input_path)
+        
+        # Save background files
+        for i, file in enumerate(background_files):
+            input_path = f"uploads/{file_id}_background_{i}{os.path.splitext(file.filename)[1]}"
+            with open(input_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            background_paths.append(input_path)
+        
+        # Process with ImageProcessor
+        processor = ImageProcessor()
+        result_paths = await processor.person_swap_separate(person_paths, background_paths, file_id)
+        
+        # Save to database if user is authenticated
+        if user:
+            db = next(get_db())
+            for i, result_path in enumerate(result_paths):
+                processed_image = ProcessedImage(
+                    user_id=user.id,
+                    original_filename=f"person_swap_{i}.jpg",
+                    processed_filename=os.path.basename(result_path),
+                    processing_type="person_swap"
+                )
+                db.add(processed_image)
+            db.commit()
+        
+        # Return first result or create ZIP with multiple results
+        if len(result_paths) == 1:
+            return FileResponse(
+                result_paths[0],
+                media_type="image/jpeg",
+                filename="person_swap_result.jpg",
+                headers={"Content-Disposition": "attachment"}
+            )
+        else:
+            # Return JSON with multiple download links
+            return {"message": "Person swap complete", "results": [os.path.basename(path) for path in result_paths]}
+        
+    except Exception as e:
+        logger.error(f"API Error in person_swap: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up input files
+        for path in person_paths + background_paths:
+            try:
+                os.remove(path)
+            except:
+                pass
+
+# API Documentation endpoint
+@app.get("/api/docs")
+async def api_documentation():
+    """API Documentation"""
+    docs = {
+        "title": "PhotoProcessor REST API",
+        "version": "1.0.0",
+        "description": "Complete REST API for image processing operations",
+        "endpoints": {
+            "/api/remove-background": {
+                "method": "POST",
+                "description": "Remove background from image",
+                "parameters": {
+                    "file": "Image file (required)",
+                    "method": "rembg or lbm (optional, default: rembg)"
+                },
+                "response": "Processed image file"
+            },
+            "/api/add-frame": {
+                "method": "POST", 
+                "description": "Add decorative frame to image",
+                "parameters": {
+                    "file": "Image file (required)",
+                    "frame_style": "classic, modern, vintage, elegant (optional, default: classic)",
+                    "frame_file": "Custom frame file (optional)"
+                },
+                "response": "Framed image file"
+            },
+            "/api/smart-crop": {
+                "method": "POST",
+                "description": "Smart crop image to desired aspect ratio",
+                "parameters": {
+                    "file": "Image file (required)",
+                    "aspect_ratio": "1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3 (optional, default: 1:1)"
+                },
+                "response": "Cropped image file"
+            },
+            "/api/retouch": {
+                "method": "POST",
+                "description": "Automatic photo retouching and enhancement",
+                "parameters": {
+                    "file": "Image file (required)"
+                },
+                "response": "Retouched image file"
+            },
+            "/api/social-media-optimize": {
+                "method": "POST",
+                "description": "Optimize image for all social media platforms",
+                "parameters": {
+                    "file": "Image file (required)"
+                },
+                "response": "JSON with download links for all platform versions"
+            },
+            "/api/create-collage": {
+                "method": "POST",
+                "description": "Create photo collages",
+                "parameters": {
+                    "files": "Multiple image files (required)",
+                    "collage_type": "polaroid, 5x15, 5x5, magazine, passport, filmstrip, grid, vintage, universal (optional, default: polaroid)",
+                    "caption": "Text caption (optional)"
+                },
+                "response": "Collage image file"
+            },
+            "/api/person-swap": {
+                "method": "POST",
+                "description": "Swap people onto different backgrounds",
+                "parameters": {
+                    "person_files": "Images with people (required)",
+                    "background_files": "Background images (required)"
+                },
+                "response": "Processed image(s) with people on new backgrounds"
+            }
+        },
+        "authentication": "Optional - include Authorization: Bearer <token> for user tracking",
+        "example_usage": {
+            "curl": "curl -X POST -F 'file=@image.jpg' -F 'method=rembg' https://your-domain.com/api/remove-background"
+        }
+    }
+    return docs
+
 # Telegram webhook endpoint
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
