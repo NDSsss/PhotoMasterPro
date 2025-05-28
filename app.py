@@ -36,6 +36,24 @@ perf_logger.setLevel(logging.INFO)
 # Helper function for timing operations
 @contextmanager
 def timer(operation_name: str, request_id: str = None):
+    """
+    Context manager for timing and logging operations.
+    
+    Automatically logs the start and completion of operations with execution time.
+    Useful for performance monitoring and debugging slow operations.
+    
+    Args:
+        operation_name (str): Descriptive name of the operation being timed
+        request_id (str, optional): Unique identifier for request tracking
+        
+    Yields:
+        None: Context for the timed operation
+        
+    Example:
+        with timer("Image processing", "req_123"):
+            # Your code here
+            process_image()
+    """
     start_time = time.time()
     request_prefix = f"[{request_id}] " if request_id else ""
     logger.info(f"{request_prefix}🚀 STARTING: {operation_name}")
@@ -95,6 +113,21 @@ class Token(BaseModel):
 init_db()
 
 def create_access_token(data: dict):
+    """
+    Creates a JWT access token for user authentication.
+    
+    Generates a JSON Web Token with user data and expiration time for secure
+    API access. Used during login to provide authenticated session tokens.
+    
+    Args:
+        data (dict): User data to encode in token (typically contains username)
+        
+    Returns:
+        str: Encoded JWT token string
+        
+    Example:
+        token = create_access_token({"sub": "john_doe"})
+    """
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -102,12 +135,63 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 def get_password_hash(password):
+    """
+    Hashes a plain text password using bcrypt.
+    
+    Securely hashes passwords before storing in database. Uses bcrypt
+    algorithm with automatic salt generation for maximum security.
+    
+    Args:
+        password (str): Plain text password to hash
+        
+    Returns:
+        str: Securely hashed password
+        
+    Example:
+        hashed = get_password_hash("my_password123")
+    """
     return pwd_context.hash(password)
 
 def verify_password(plain_password, hashed_password):
+    """
+    Verifies a plain text password against its hash.
+    
+    Safely compares user input password with stored hash during login.
+    Uses constant-time comparison to prevent timing attacks.
+    
+    Args:
+        plain_password (str): User input password
+        hashed_password (str): Stored password hash from database
+        
+    Returns:
+        bool: True if password matches, False otherwise
+        
+    Example:
+        is_valid = verify_password("user_input", stored_hash)
+    """
     return pwd_context.verify(plain_password, hashed_password)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Retrieves current authenticated user from JWT token.
+    
+    Validates JWT token from Authorization header and returns the corresponding
+    user object. Used as dependency for protected endpoints requiring authentication.
+    
+    Args:
+        credentials: HTTP Bearer token from Authorization header
+        
+    Returns:
+        User: Authenticated user object from database
+        
+    Raises:
+        HTTPException: 401 if token is invalid or user not found
+        
+    Example:
+        @app.get("/protected")
+        async def protected_route(user: User = Depends(get_current_user)):
+            return {"user": user.username}
+    """
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -123,7 +207,27 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return user
 
 async def get_current_user_optional(request: Request):
-    """Get current user if authenticated, otherwise return None"""
+    """
+    Retrieves current user if authenticated, returns None if not.
+    
+    Non-blocking authentication check that allows endpoints to work for both
+    authenticated and anonymous users. Useful for features that enhance
+    experience for logged-in users but don't require authentication.
+    
+    Args:
+        request (Request): FastAPI request object containing headers
+        
+    Returns:
+        User | None: User object if authenticated, None if anonymous
+        
+    Example:
+        @app.post("/upload")
+        async def upload(user = Depends(get_current_user_optional)):
+            if user:
+                # Save to user's gallery
+                save_to_gallery(file, user.id)
+            # Process for anonymous user
+    """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return None
@@ -159,6 +263,30 @@ async def gallery_page(request: Request, user: User = Depends(get_current_user))
 # Auth endpoints
 @app.post("/api/register", response_model=Token)
 async def register(user: UserCreate):
+    """
+    Register a new user account.
+    
+    Creates a new user account with username, email and password.
+    Automatically generates authentication token for immediate login.
+    Validates that username and email are unique.
+    
+    Args:
+        user (UserCreate): User registration data containing username, email, password
+        
+    Returns:
+        Token: JWT access token and token type for authentication
+        
+    Raises:
+        HTTPException: 400 if username or email already exists
+        
+    Example:
+        POST /api/register
+        {
+            "username": "john_doe",
+            "email": "john@example.com", 
+            "password": "secure_password123"
+        }
+    """
     db = get_db()
     
     # Check if user exists
@@ -180,6 +308,28 @@ async def register(user: UserCreate):
 
 @app.post("/api/login", response_model=Token)
 async def login(user: UserLogin):
+    """
+    Authenticate user and return access token.
+    
+    Validates user credentials and returns JWT token for API access.
+    Token is required for protected endpoints and user-specific features.
+    
+    Args:
+        user (UserLogin): Login credentials containing username and password
+        
+    Returns:
+        Token: JWT access token and token type for API authentication
+        
+    Raises:
+        HTTPException: 401 if credentials are invalid
+        
+    Example:
+        POST /api/login
+        {
+            "username": "john_doe",
+            "password": "secure_password123"
+        }
+    """
     db = get_db()
     db_user = db.query(User).filter(User.username == user.username).first()
     
@@ -192,6 +342,32 @@ async def login(user: UserLogin):
 # Image processing endpoints
 @app.post("/api/remove-background")
 async def remove_background(request: Request, file: UploadFile = File(...), method: str = Form("rembg")):
+    """
+    Remove background from uploaded image using AI.
+    
+    Processes uploaded image to remove background using advanced AI models.
+    Supports multiple methods including rembg and LBM for different quality levels.
+    Works for both authenticated users (saves to gallery) and anonymous users.
+    
+    Args:
+        request (Request): HTTP request object for user detection
+        file (UploadFile): Image file to process (JPG, PNG, etc.)
+        method (str): Background removal method ("rembg" or "lbm")
+        
+    Returns:
+        dict: Success status and URL path to processed image
+        
+    Raises:
+        HTTPException: 400 if file is not an image, 500 if processing fails
+        
+    Example:
+        POST /api/remove-background
+        Content-Type: multipart/form-data
+        - file: image.jpg
+        - method: rembg
+        
+        Response: {"success": true, "output_path": "/processed/uuid_no_bg.png"}
+    """
     user = await get_current_user_optional(request)
     
     if not file.content_type or not file.content_type.startswith('image/'):

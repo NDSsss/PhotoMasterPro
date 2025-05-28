@@ -22,9 +22,16 @@ def timer_step(step_name: str, file_id: str = None):
         logger.info(f"{request_prefix}✅ STEP DONE: {step_name} - Duration: {duration:.2f}s")
 
 class SmartCropper:
-    """Класс для умной обрезки изображений с фокусом на лицах"""
+    """
+    Intelligent image cropping system with face detection and composition analysis.
+    
+    Automatically crops images to desired aspect ratios while preserving important
+    content like faces and applying composition rules. Uses OpenCV for face detection
+    and maintains a safety margin from image edges for better visual appeal.
+    """
     
     def __init__(self):
+        """Initialize SmartCropper with face detection cascade."""
         self.face_cascade = None
         
     def _load_face_cascade(self):

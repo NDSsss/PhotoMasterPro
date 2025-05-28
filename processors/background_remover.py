@@ -33,13 +33,41 @@ def get_rembg():
     return rembg_remove
 
 class BackgroundRemover:
-    """Класс для удаления фона с изображений"""
+    """
+    Specialized class for AI-powered background removal from images.
+    
+    Handles background removal using multiple AI methods including rembg library
+    and LBM (jasperai) for different quality levels and processing speeds.
+    Automatically optimizes output and handles various image formats.
+    """
     
     def __init__(self):
+        """Initialize BackgroundRemover with default settings."""
         pass
         
     async def remove_background(self, input_path: str, file_id: str, method: str = "rembg") -> str:
-        """Remove background from image using specified method"""
+        """
+        Remove background from image using specified AI method.
+        
+        Processes image to remove background while preserving subject details.
+        Supports multiple AI models for different quality vs speed tradeoffs.
+        
+        Args:
+            input_path (str): Path to input image file
+            file_id (str): Unique identifier for tracking and logging
+            method (str): Processing method ("rembg" for fast, "lbm" for high quality)
+            
+        Returns:
+            str: Path to processed image with transparent background
+            
+        Raises:
+            ValueError: If unknown method specified
+            Exception: If AI processing fails or file operations error
+            
+        Example:
+            remover = BackgroundRemover()
+            result = await remover.remove_background("input.jpg", "uuid", "rembg")
+        """
         logger.info(f"[{file_id}] 🎨 Starting background removal with method: {method}")
         logger.info(f"[{file_id}] 📁 Input file: {input_path}")
         
