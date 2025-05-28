@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Документация - PhotoProcessor</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        .code-block {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .endpoint-card {
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 20px;
+        }
+        .method-badge {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .method-post { background-color: #198754; }
+        .method-get { background-color: #0d6efd; }
+        .sidebar {
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        .sidebar a {
+            color: #adb5bd;
+            text-decoration: none;
+            padding: 8px 15px;
+            display: block;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            background-color: #495057;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fas fa-camera me-2"></i>
+                PhotoProcessor
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Главная</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/upload">Обработать фото</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/docs">
+                            <i class="fas fa-book me-1"></i>Документация
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showLoginModal()">Войти</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3">
+                <div class="sidebar">
+                    <h6 class="text-muted mb-3">СОДЕРЖАНИЕ</h6>
+                    <a href="#overview" class="active">Обзор API</a>
+                    <a href="#authentication">Аутентификация</a>
+                    <a href="#endpoints">Основные функции</a>
+                    <a href="#remove-bg">Удаление фона</a>
+                    <a href="#add-frame">Добавление рамок</a>
+                    <a href="#smart-crop">Умная обрезка</a>
+                    <a href="#retouch">Ретушь фото</a>
+                    <a href="#social-optimize">Оптимизация для соцсетей</a>
+                    <a href="#collage">Создание коллажей</a>
+                    <a href="#person-swap">Замена людей</a>
+                    <a href="#examples">Примеры использования</a>
+                    <a href="#errors">Коды ошибок</a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9">
+                <div class="documentation-content">
+                    <!-- Overview -->
+                    <section id="overview" class="mb-5">
+                        <h1 class="mb-4">
+                            <i class="fas fa-code me-2"></i>
+                            API Документация PhotoProcessor
+                        </h1>
+                        <p class="lead">
+                            PhotoProcessor предоставляет мощный RESTful API для автоматической обработки изображений 
+                            с использованием современных AI-технологий и алгоритмов компьютерного зрения.
+                        </p>
+                        
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5><i class="fas fa-info-circle me-2"></i>Основные возможности</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul>
+                                            <li>🎨 Удаление фона с помощью AI</li>
+                                            <li>🖼️ Добавление декоративных рамок</li>
+                                            <li>✂️ Умная обрезка с определением лиц</li>
+                                            <li>✨ Автоматическая ретушь</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul>
+                                            <li>📱 Оптимизация для соцсетей</li>
+                                            <li>🎭 Создание коллажей и открыток</li>
+                                            <li>👥 Замена людей на фонах</li>
+                                            <li>🔒 JWT аутентификация</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-globe me-2"></i>Базовый URL</h6>
+                            <code>{{ base_url }}</code>
+                        </div>
+                    </section>
+
+                    <!-- Authentication -->
+                    <section id="authentication" class="mb-5">
+                        <h2><i class="fas fa-key me-2"></i>Аутентификация</h2>
+                        <p>API использует JWT токены для аутентификации. Анонимные пользователи могут использовать все функции, но их результаты не сохраняются.</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Регистрация</h5>
+                                <div class="code-block">
+<pre>POST /api/register
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "secure_password123"
+}</pre>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Авторизация</h5>
+                                <div class="code-block">
+<pre>POST /api/login
+Content-Type: application/json
+
+{
+  "username": "john_doe", 
+  "password": "secure_password123"
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <strong>Использование токена:</strong> Добавьте заголовок <code>Authorization: Bearer &lt;your-token&gt;</code> к запросам для аутентификации.
+                        </div>
+                    </section>
+
+                    <!-- Remove Background -->
+                    <section id="remove-bg" class="mb-5">
+                        <div class="card endpoint-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="mb-0">
+                                    <i class="fas fa-scissors me-2"></i>
+                                    Удаление фона
+                                </h3>
+                                <span class="method-badge method-post">POST</span>
+                            </div>
+                            <div class="card-body">
+                                <p>Удаляет фон с изображения используя AI-модели. Поддерживает два метода: быстрый (rembg) и высококачественный (lbm).</p>
+                                
+                                <h6>Endpoint:</h6>
+                                <div class="code-block">
+                                    <code>/api/remove-background</code>
+                                </div>
+
+                                <h6>Параметры:</h6>
+                                <ul>
+                                    <li><strong>file</strong> (обязательный) - Изображение для обработки</li>
+                                    <li><strong>method</strong> (опциональный) - Метод обработки: "rembg" (быстро) или "lbm" (качественно). По умолчанию: "rembg"</li>
+                                </ul>
+
+                                <h6>Пример запроса:</h6>
+                                <div class="code-block">
+<pre>curl -X POST {{ base_url }}/api/remove-background \
+  -F "file=@image.jpg" \
+  -F "method=rembg"</pre>
+                                </div>
+
+                                <h6>Ответ:</h6>
+                                <div class="code-block">
+<pre>{
+  "success": true,
+  "output_path": "/processed/uuid_no_bg.png"
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Add Frame -->
+                    <section id="add-frame" class="mb-5">
+                        <div class="card endpoint-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="mb-0">
+                                    <i class="fas fa-frame me-2"></i>
+                                    Добавление рамок
+                                </h3>
+                                <span class="method-badge method-post">POST</span>
+                            </div>
+                            <div class="card-body">
+                                <p>Добавляет декоративные рамки к изображениям. Поддерживает предустановленные стили и загрузку собственных рамок.</p>
+                                
+                                <h6>Endpoint:</h6>
+                                <div class="code-block">
+                                    <code>/api/add-frame</code>
+                                </div>
+
+                                <h6>Параметры:</h6>
+                                <ul>
+                                    <li><strong>file</strong> (обязательный) - Изображение для обработки</li>
+                                    <li><strong>frame_style</strong> (опциональный) - Стиль рамки: "classic", "modern", "vintage", "elegant". По умолчанию: "classic"</li>
+                                    <li><strong>frame_file</strong> (опциональный) - Собственная рамка для загрузки</li>
+                                </ul>
+
+                                <h6>Пример запроса:</h6>
+                                <div class="code-block">
+<pre>curl -X POST {{ base_url }}/api/add-frame \
+  -F "file=@photo.jpg" \
+  -F "frame_style=vintage"</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Smart Crop -->
+                    <section id="smart-crop" class="mb-5">
+                        <div class="card endpoint-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="mb-0">
+                                    <i class="fas fa-crop me-2"></i>
+                                    Умная обрезка
+                                </h3>
+                                <span class="method-badge method-post">POST</span>
+                            </div>
+                            <div class="card-body">
+                                <p>Интеллектуально обрезает изображение с сохранением важных элементов (лица, объекты). Использует алгоритмы компьютерного зрения.</p>
+                                
+                                <h6>Endpoint:</h6>
+                                <div class="code-block">
+                                    <code>/api/smart-crop</code>
+                                </div>
+
+                                <h6>Параметры:</h6>
+                                <ul>
+                                    <li><strong>file</strong> (обязательный) - Изображение для обработки</li>
+                                    <li><strong>aspect_ratio</strong> (опциональный) - Соотношение сторон: "1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3". По умолчанию: "1:1"</li>
+                                </ul>
+
+                                <h6>Поддерживаемые форматы:</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul>
+                                            <li>1:1 - Квадрат (Instagram)</li>
+                                            <li>4:3 - Стандартный альбомный</li>
+                                            <li>3:4 - Стандартный портретный</li>
+                                            <li>16:9 - Широкоэкранный</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul>
+                                            <li>9:16 - Мобильный портрет</li>
+                                            <li>3:2 - Фотографический</li>
+                                            <li>2:3 - Портретный фото</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Social Media Optimization -->
+                    <section id="social-optimize" class="mb-5">
+                        <div class="card endpoint-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3 class="mb-0">
+                                    <i class="fas fa-share-alt me-2"></i>
+                                    Оптимизация для соцсетей
+                                </h3>
+                                <span class="method-badge method-post">POST</span>
+                            </div>
+                            <div class="card-body">
+                                <p>Создает оптимизированные версии изображения для всех популярных социальных платформ одним запросом.</p>
+                                
+                                <h6>Endpoint:</h6>
+                                <div class="code-block">
+                                    <code>/api/social-media-optimize</code>
+                                </div>
+
+                                <h6>Поддерживаемые платформы:</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul>
+                                            <li><strong>Instagram:</strong> 1080x1080px, JPEG 85%</li>
+                                            <li><strong>Facebook:</strong> 1200x630px, JPEG 85%</li>
+                                            <li><strong>Twitter:</strong> 1024x512px, JPEG 85%</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul>
+                                            <li><strong>LinkedIn:</strong> 1200x627px, JPEG 90%</li>
+                                            <li><strong>YouTube:</strong> 1280x720px, JPEG 90%</li>
+                                            <li><strong>TikTok:</strong> 1080x1920px, JPEG 85%</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <h6>Ответ:</h6>
+                                <div class="code-block">
+<pre>{
+  "success": true,
+  "results": {
+    "instagram": {
+      "path": "/processed/uuid_instagram_optimized.jpg",
+      "size": [1080, 1080],
+      "file_size": "245KB"
+    },
+    "facebook": {
+      "path": "/processed/uuid_facebook_optimized.jpg", 
+      "size": [1200, 630],
+      "file_size": "198KB"
+    }
+    // ... остальные платформы
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Examples -->
+                    <section id="examples" class="mb-5">
+                        <h2><i class="fas fa-code me-2"></i>Примеры использования</h2>
+                        
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>Python с requests</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="code-block">
+<pre>import requests
+
+# Удаление фона
+files = {'file': open('image.jpg', 'rb')}
+data = {'method': 'rembg'}
+response = requests.post('{{ base_url }}/api/remove-background', 
+                        files=files, data=data)
+
+if response.json()['success']:
+    print(f"Результат: {response.json()['output_path']}")
+</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>JavaScript с Fetch API</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="code-block">
+<pre>const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+formData.append('aspect_ratio', '1:1');
+
+fetch('{{ base_url }}/api/smart-crop', {
+    method: 'POST',
+    body: formData
+})
+.then(response => response.json())
+.then(data => {
+    if (data.success) {
+        console.log('Обрезанное изображение:', data.output_path);
+    }
+});
+</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Error Codes -->
+                    <section id="errors" class="mb-5">
+                        <h2><i class="fas fa-exclamation-triangle me-2"></i>Коды ошибок</h2>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Код</th>
+                                        <th>Описание</th>
+                                        <th>Решение</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="badge bg-danger">400</span></td>
+                                        <td>Неверный формат файла</td>
+                                        <td>Убедитесь, что загружаете изображение (JPG, PNG, GIF)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-warning">401</span></td>
+                                        <td>Неверный токен аутентификации</td>
+                                        <td>Проверьте JWT токен или войдите заново</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-danger">413</span></td>
+                                        <td>Файл слишком большой</td>
+                                        <td>Максимальный размер файла: 10MB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-danger">500</span></td>
+                                        <td>Ошибка обработки</td>
+                                        <td>Попробуйте другой метод или обратитесь в поддержку</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Smooth scrolling for sidebar links
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                
+                if (targetElement) {
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                    
+                    // Update active link
+                    document.querySelectorAll('.sidebar a').forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                }
+            });
+        });
+
+        // Update active link on scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const scrollPos = window.scrollY + 100;
+            
+            sections.forEach(section => {
+                const top = section.offsetTop;
+                const bottom = top + section.offsetHeight;
+                const id = section.getAttribute('id');
+                
+                if (scrollPos >= top && scrollPos <= bottom) {
+                    document.querySelectorAll('.sidebar a').forEach(l => l.classList.remove('active'));
+                    document.querySelector(`.sidebar a[href="#${id}"]`)?.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

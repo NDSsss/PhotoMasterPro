@@ -260,6 +260,27 @@ async def gallery_page(request: Request, user: User = Depends(get_current_user))
     images = db.query(ProcessedImage).filter(ProcessedImage.user_id == user.id).order_by(ProcessedImage.created_at.desc()).all()
     return templates.TemplateResponse("gallery.html", {"request": request, "images": images, "user": user})
 
+@app.get("/docs", response_class=HTMLResponse)
+async def documentation_page(request: Request):
+    """
+    Display comprehensive API documentation with examples and usage guides.
+    
+    Provides detailed documentation for all API endpoints including authentication,
+    parameters, response formats, code examples, and error handling. Features
+    interactive navigation and comprehensive usage examples.
+    
+    Args:
+        request (Request): HTTP request object for template rendering
+        
+    Returns:
+        HTMLResponse: Rendered documentation page with full API reference
+        
+    Example:
+        GET /docs - Access complete API documentation
+    """
+    base_url = str(request.base_url).rstrip('/')
+    return templates.TemplateResponse("documentation.html", {"request": request, "base_url": base_url})
+
 # Auth endpoints
 @app.post("/api/register", response_model=Token)
 async def register(user: UserCreate):
